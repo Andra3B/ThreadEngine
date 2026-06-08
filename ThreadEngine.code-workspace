@@ -1,0 +1,26 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Debug Thread",
+				"type": "lua-local",
+				"request": "launch",
+				"program": {
+					"command": "lovr"
+				},
+				"args": [
+					"${workspaceFolder}"
+				],
+				"cwd": "${workspaceFolder}",
+				"internalConsoleOptions": "openOnSessionStart"
+			}
+		]
+	}
+}
