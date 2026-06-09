@@ -26,7 +26,7 @@ function lovr.conf(t)
 	t.audio.reverb.rays = 4096
 	t.audio.reverb.bounces = 4
 	t.audio.reverb.duration = 2
-	t.audio.reverb.rate = .1
+	t.audio.reverb.rate = 0.1
 
 	-- Graphics
 	t.graphics.debug = false
@@ -36,15 +36,7 @@ function lovr.conf(t)
 	t.graphics.shadercache = true
 
 	-- Headset settings
-	t.headset.connect = false
-	t.headset.start = false
-	t.headset.supersample = false
-	t.headset.seated = false
-	t.headset.mask = true
-	t.headset.antialias = true
-	t.headset.stencil = false
-	t.headset.submitdepth = true
-	t.headset.overlay = false
+	t.headset = nil
 
 	-- Math settings
 	t.math.globals = true
@@ -53,11 +45,5 @@ function lovr.conf(t)
 	t.thread.workers = -1
 
 	-- Configure the desktop window
-	t.window.width = 1080
-	t.window.height = 720
-	t.window.centered = true
-	t.window.fullscreen = false
-	t.window.resizable = true
-	t.window.title = 'Thread Engine'
-	t.window.icon = nil
+	t.window = nil
 end

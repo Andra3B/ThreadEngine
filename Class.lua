@@ -1,0 +1,177 @@
+local Class = {}
+
+local function IndexMetamethod(self, name)
+	local getter = self.Class["Get"..name] or self.Class["Is"..name]
+
+	if getter then
+		return getter(self)
+	else
+		return self.Class[name]
+	end
+end
+
+local function NewIndexMetamethod(self, name, value)
+	local setter = self.Class["Set"..name]
+
+	if setter then		
+		if setter(self, value) then
+			local dependents = self.Class.PROPERTY_DEPENDENCIES[name]
+			
+			if dependents then
+				for _, dependency in pairs(dependents) do
+					self[dependency] = Class.NOT_SET
+				end
+			end
+		end
+	else
+		rawset(self, name, value)
+	end
+end
+
+Class.__index = Class
+Class.Type = "Class"
+
+Class.NOT_SET = table.new(0, 0)
+
+Class.INSTANCE_METATABLE = {__index = IndexMetamethod, __newindex = NewIndexMetamethod}
+Class.PROPERTY_DEPENDENCIES = table.empty
+
+function Class.CreateClass(class, typeName, base, indexMetamethod, newIndexMetamethod, classPath)
+	base = base or Class
+	
+	for name, value in pairs(base) do
+		if string.sub(name, 1, 2) == "__" and not class[name] then
+			class[name] = value
+		end
+	end
+
+	class.__index = class
+	class.Type = typeName
+	
+	class.INSTANCE_METATABLE = {}
+	class.CLASS_INDICATOR = true
+	
+	for name, value in pairs(class) do
+		if string.sub(name, 1, 2) == "__" then
+			class.INSTANCE_METATABLE[name] = value
+		end
+	end
+	
+	class.INSTANCE_METATABLE.__index = indexMetamethod or base.INSTANCE_METATABLE.__index
+	class.INSTANCE_METATABLE.__newindex = newIndexMetamethod or base.INSTANCE_METATABLE.__newindex
+
+	class.PROPERTY_DEPENDENCIES = {}
+	
+	for property, dependents in pairs(base.PROPERTY_DEPENDENCIES) do
+		class.PROPERTY_DEPENDENCIES[property] = {}
+
+		for _, dependentProperty in ipairs(dependents) do
+			table.insert(class.PROPERTY_DEPENDENCIES[property], dependentProperty)
+		end
+	end
+	
+	if classPath then
+		local functionName = nil
+		local attributeName = nil
+		local attributeArguments = nil
+
+		for line in lovr.filesystem.lines(classPath) do
+			local attribute, arguments = string.match(line, "%-%-%[%[%s*([%w_]+)%s*:?(.*)%s*%]%]%-%-")
+
+			if attribute then
+				functionName = nil
+				
+				attributeName = attribute
+				attributeArguments = {}
+				
+				for argument in string.gmatch(arguments, "[%w_]+") do
+					table.insert(attributeArguments, argument)
+				end
+			else
+				functionName = string.match(line, "function .+:([%w_]+)") or functionName
+			end
+
+			if attributeName == "DependsOn" then
+				if functionName then
+					local property = string.match(functionName, "Get(.+)") or string.match("Is(.+)")
+
+					if property then
+						for _, dependentProperty in pairs(attributeArguments) do
+							local dependents = class.PROPERTY_DEPENDENCIES[dependentProperty]
+
+							if not dependents then
+								dependents = {}
+
+								class.PROPERTY_DEPENDENCIES[dependentProperty] = dependents
+							end
+
+							table.insert(dependents, property)
+						end
+					end
+
+					attributeName = nil
+					attributeArguments = nil
+				end
+			end
+		end
+	end
+
+	return setmetatable(class, base)
+end
+
+function Class.CreateInstance(instance, class)
+	instance = instance or {}
+	
+	instance.Class = class
+	instance.CLASS_INSTANCE_INDICATOR = true
+
+	return setmetatable(instance, class.INSTANCE_METATABLE)
+end
+
+function Class:IsA(typeName)
+	local luaType = type(self)
+
+	if luaType == "table" and self.CLASS_INSTANCE_INDICATOR then
+		for class in self:IterateInheritance() do
+			if class.Type == typeName then
+				return true
+			end
+		end
+
+		return false
+	end
+	
+	return luaType == typeName
+end
+
+function Class:GetType()
+	local luaType = type(self)
+
+	if luaType == "table" and self.CLASS_INDICATOR then
+		return self.CLASS_INSTANCE_INDICATOR and self.Class.Type or self.Type
+	end
+
+	return luaType
+end
+
+local function InheritanceIterator(stopAt, currentClass)
+	if currentClass.CLASS_INSTANCE_INDICATOR then
+		return currentClass.Class
+	else
+		local nextClass = getmetatable(currentClass)
+
+		if nextClass ~= stopAt then
+			return nextClass
+		end
+	end
+end
+
+function Class:IterateInheritance(stopAt)
+	return InheritanceIterator, stopAt, self
+end
+
+function Class.__tostring(entity)
+	return entity.CLASS_INSTANCE_INDICATOR and entity.Class.Type.." Instance" or entity.Type.." Class"
+end
+
+return Class
