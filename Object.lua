@@ -35,14 +35,6 @@ function Object.Create()
 	return self
 end
 
-function Object:Clone(clone)
-	clone = clone or Object.Create()
-
-	clone.Name = self.Name
-
-	return clone
-end
-
 function Object:Update(deltaTime)
 	self._Events:Update()
 end

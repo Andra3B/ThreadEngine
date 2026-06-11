@@ -40,18 +40,6 @@ function Hierarchy.Create()
 	return self
 end
 
-function Hierarchy:Clone(clone)
-	clone = Object.Clone(self, clone or Hierarchy.Create())
-
-	for _, child in ipairs(self.Children) do
-		if child.Clone then
-			child:Clone().Parent = clone
-		end
-	end
-
-	return clone
-end
-
 function Hierarchy:GetParent()
 	return self._Parent
 end
