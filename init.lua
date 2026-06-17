@@ -66,8 +66,16 @@ Log = require("Log")
 EventDirector = require("EventDirector")
 EventListener = require("EventListener")
 
+Vector2 = require("Math.Vector2")
+Vector3 = require("Math.Vector3")
+Vector4 = require("Math.Vector4")
+Quaternion = require("Math.Quaternion")
+Matrix4 = require("Math.Matrix4")
+
 Timer = require("Timer")
 Input = require("Input")
+
+Interface = require("Interface.Interface")
 
 local MOUSE_INPUTS = {
 	"m_leftmousebutton",
@@ -92,11 +100,15 @@ Thread = {}
 
 Thread.Events = nil
 
+Thread.Meshes = {}
+
 local function ThreadQuit(exitCode)
 	Thread.Quit(exitCode)
 
 	Timer.DestroyTimers()
 	Input.DestroyInputs()
+
+	table.erase(Thread.Meshes, function(mesh) mesh:release() end)
 
 	Thread.Events:Destroy()
 	Thread.Events = nil
@@ -107,12 +119,12 @@ function Thread.Update(deltaTime) end
 function Thread.Quit(exitCode) end
 function Thread.Restart() end 
 
-function lovr.keypressed(key) Input.TriggerInput("k_"..key, vector(0, 0, -1), false) end
-function lovr.keyreleased(key) Input.TriggerInput("k_"..key, vector(0, 0, -1), true) end
-function lovr.mousemoved(x, y, dx, dy) Input.TriggerInput("m_movement", vector(dx, dy, nil)) end
-function lovr.wheelmoved(dx, dy) Input.TriggerInput("m_wheelmovement", vector(dx, dy, nil)) end
-function lovr.mousepressed(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], vector(0, 0, -1), false) end
-function lovr.mousereleased(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], vector(0, 0, -1), true) end
+function lovr.keypressed(key) Input.TriggerInput("k_"..key, Vector3.Backward, false) end
+function lovr.keyreleased(key) Input.TriggerInput("k_"..key, Vector3.Backward, true) end
+function lovr.mousemoved(x, y, dx, dy) Input.TriggerInput("m_movement", Vector3.Create(dx, dy, nil)) end
+function lovr.wheelmoved(dx, dy) Input.TriggerInput("m_wheelmovement", Vector3.Create(dx, dy, nil)) end
+function lovr.mousepressed(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Backward, false) end
+function lovr.mousereleased(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Backward, true) end
 
 function lovr.errhand(message)
 	Log.Error("Thread", debug.traceback(tostring(message), 2):gsub("\n[^\n]+$", ""))
@@ -126,6 +138,25 @@ function lovr.run()
 	engineOptions = Thread.Load() or DEFAULT_ENGINE_OPTIONS
 
 	lovr.system.openWindow(engineOptions.Window or DEFAULT_ENGINE_OPTIONS.Window)
+
+	lovr.graphics.setBackgroundColor(0, 0, 0, 1)
+
+	Thread.Meshes.Square = lovr.graphics.newMesh({
+		{name = "VertexPosition", type = "vec2"},
+		{name = "VertexUV", type = "vec2"}
+	}, {
+		{0, 0, 0, 0},
+		{0, 1, 0, 1},
+		{1, 1, 1, 1},
+		{1, 0, 1, 0}
+	}, {
+		storage = "gpu"
+	})
+
+	Thread.Meshes.Square:setIndices({
+		1, 2, 3,
+		1, 3, 4
+	})
 
 	lovr.timer.step()
 	return function()

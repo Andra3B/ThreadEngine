@@ -19,7 +19,7 @@ local function NewIndexMetamethod(self, name, value)
 			
 			if dependents then
 				for _, dependency in pairs(dependents) do
-					self[dependency] = Class.NOT_SET
+					self[dependency] = Class.NIL
 				end
 			end
 		end
@@ -31,7 +31,7 @@ end
 Class.__index = Class
 Class.Type = "Class"
 
-Class.NOT_SET = table.new(0, 0)
+Class.NIL = table.new(0, 0)
 
 Class.INSTANCE_METATABLE = {__index = IndexMetamethod, __newindex = NewIndexMetamethod}
 Class.PROPERTY_DEPENDENCIES = table.empty

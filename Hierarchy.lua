@@ -7,12 +7,12 @@ local function NewIndexMetamethod(self, name, value)
 		local oldValue = self["_"..name]
 		local set, setValue = setter(self, value)
 		
-		if set or value == Class.NOT_SET then
+		if set or value == Class.NIL then
 			local dependents = self.Class.PROPERTY_DEPENDENCIES[name]
 			
 			if dependents then
 				for _, dependency in pairs(dependents) do
-					self[dependency] = Class.NOT_SET
+					self[dependency] = Class.NIL
 				end
 			end
 

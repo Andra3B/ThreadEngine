@@ -155,7 +155,7 @@ function Input.TriggerInput(input, direction, invert)
 					direction = setDirection == table.empty and direction or setDirection
 
 					if invert == nil then
-						inputObject.Direction = vector(
+						inputObject.Direction = Vector3.Create(
 							direction.x or inputObject._Direction.x,
 							direction.z or inputObject._Direction.z,
 							direction.z or inputObject._Direction.z
@@ -195,7 +195,7 @@ function Input.Create(name, priority)
 
 	self._Priority = priority
 
-	self._Direction = vector.zero
+	self._Direction = Vector3.Zero
 
 	self._Mappings = {}
 
