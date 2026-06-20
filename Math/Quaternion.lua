@@ -127,24 +127,23 @@ function Quaternion:Conjugate()
 end
 
 function Quaternion:Inverse()
-	local inverseSquareMagnitude = self.W^2 + self.X^2 + self.Y^2 + self.Z^2
-	local negativeInverseSquareMagnitude = -inverseSquareMagnitude
+	local inverseMagnitude = 1 / math.sqrt(self.W^2 + self.X^2 + self.Y^2 + self.Z^2)
 
 	return Quaternion.Create(
-		self.W * inverseSquareMagnitude,
-		self.X * negativeInverseSquareMagnitude,
-		self.Y * negativeInverseSquareMagnitude,
-		self.Z * negativeInverseSquareMagnitude
+		self.W * inverseMagnitude,
+		self.X * -inverseMagnitude,
+		self.Y * -inverseMagnitude,
+		self.Z * -inverseMagnitude
 	)
 end
 
-function Quaternion:ConvertToRotationMatrix()
+function Quaternion:ConvertToMatrix()
 	local w, x, y, z = self:Unpack()
 
 	return Matrix4.Create({
-		1 - 2*(y*y + z*z), 2*(x*y - w*z), 2*(x*z + w*y), 0,
-		2*(x*y + w*z), 1 - 2*(x*x + z*z), 2*(y*z - w*x), 0,
-		2*(x*z - w*y), 2*(y*z + w*x), 1 - 2*(x*x + y*y), 0,
+		1 - 2*(y*y + z*z), 2*(x*y + w*z), 2*(x*z - w*y), 0,
+		2*(x*y - w*z), 1 - 2*(x*x + z*z), 2*(y*z + w*x), 0,
+		2*(x*z + w*y), 2*(y*z - w*x), 1 - 2*(x*x + y*y), 0,
 		0, 0, 0, 1
 	})
 end
@@ -243,4 +242,4 @@ Class.CreateClass(Quaternion, "Quaternion")
 Quaternion.Zero = Quaternion.Create(0, 0, 0, 0)
 Quaternion.One = Quaternion.Create(1, 0, 0, 0)
 
-return Class.CreateClass(Quaternion, "Quaternion")
+return Quaternion

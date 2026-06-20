@@ -7,17 +7,17 @@ local function NewIndexMetamethod(self, name, value)
 		local oldValue = self["_"..name]
 		local set, setValue = setter(self, value)
 		
-		if set or value == Class.NIL then
-			local dependents = self.Class.PROPERTY_DEPENDENCIES[name]
+		if set then
+			local selfDependents = self.Class.DEPENDENCIES.Self[name]
 			
-			if dependents then
-				for _, dependency in pairs(dependents) do
+			if selfDependents then
+				for _, dependency in pairs(selfDependents) do
 					self[dependency] = Class.NIL
 				end
 			end
 
 			if not self.Destroyed then
-				self.Events:Trigger(name.."Changed", setValue, oldValue)
+				self._Events:Trigger(name.."Changed", setValue, oldValue)
 			end
 		end
 	else
@@ -30,7 +30,7 @@ function Object.Create()
 
 	self._Events = EventDirector.Create(self)
 
-	self._Name = ""
+	self._Name = nil
 
 	return self
 end
@@ -44,12 +44,10 @@ function Object:GetName()
 end
 
 function Object:SetName(name)
-	name = tostring(name)
-
 	if name ~= self._Name then
 		self._Name = name
 
-		return true, self._Name
+		return true, name
 	end
 end
 
@@ -67,4 +65,12 @@ function Object:Destroy()
 	end
 end
 
-return Class.CreateClass(Object, "Object", Entity, nil, NewIndexMetamethod)
+function Object.__tostring(object)
+	if object._Name and #object._Name > 0 then
+		return object._Name
+	else
+		return Entity.__tostring(object)
+	end
+end
+
+return Class.CreateClass(Object, "Object", Entity, nil, nil, NewIndexMetamethod)

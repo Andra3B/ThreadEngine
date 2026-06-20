@@ -164,4 +164,10 @@ Vector4.Right = Vector4.Create(1, 0, 0, 0)
 Vector4.Forward = Vector4.Create(0, 0, 1, 0)
 Vector4.Backward = Vector4.Create(0, 0, -1, 0)
 
-return Class.CreateClass(Vector4, "Vector4")
+Vector4.Black = Vector4.Create(0, 0, 0, 1)
+Vector4.White = Vector4.Create(1, 1, 1, 1)
+Vector4.Red = Vector4.Create(1, 0, 0, 1)
+Vector4.Green = Vector4.Create(0, 1, 0, 1)
+Vector4.Blue = Vector4.Create(0, 0, 1, 1)
+
+return Vector4

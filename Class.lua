@@ -15,10 +15,10 @@ local function NewIndexMetamethod(self, name, value)
 
 	if setter then		
 		if setter(self, value) then
-			local dependents = self.Class.PROPERTY_DEPENDENCIES[name]
+			local selfDependents = self.Class.DEPENDENCIES.Self[name]
 			
-			if dependents then
-				for _, dependency in pairs(dependents) do
+			if selfDependents then
+				for _, dependency in pairs(selfDependents) do
 					self[dependency] = Class.NIL
 				end
 			end
@@ -34,9 +34,13 @@ Class.Type = "Class"
 Class.NIL = table.new(0, 0)
 
 Class.INSTANCE_METATABLE = {__index = IndexMetamethod, __newindex = NewIndexMetamethod}
-Class.PROPERTY_DEPENDENCIES = table.empty
+Class.DEPENDENCIES = {
+	Parent = table.empty,
+	Self = table.empty,
+	Children = table.empty
+}
 
-function Class.CreateClass(class, typeName, base, indexMetamethod, newIndexMetamethod, classPath)
+function Class.CreateClass(class, typeName, base, classPath, indexMetamethod, newIndexMetamethod)
 	base = base or Class
 	
 	for name, value in pairs(base) do
@@ -60,22 +64,22 @@ function Class.CreateClass(class, typeName, base, indexMetamethod, newIndexMetam
 	class.INSTANCE_METATABLE.__index = indexMetamethod or base.INSTANCE_METATABLE.__index
 	class.INSTANCE_METATABLE.__newindex = newIndexMetamethod or base.INSTANCE_METATABLE.__newindex
 
-	class.PROPERTY_DEPENDENCIES = {}
-	
-	for property, dependents in pairs(base.PROPERTY_DEPENDENCIES) do
-		class.PROPERTY_DEPENDENCIES[property] = {}
+	class.DEPENDENCIES = {
+		Parent = setmetatable({}, base.DEPENDENCIES.Parent),
+		Self = setmetatable({}, base.DEPENDENCIES.Self),
+		Children = setmetatable({}, base.DEPENDENCIES.Children)
+	}
 
-		for _, dependentProperty in ipairs(dependents) do
-			table.insert(class.PROPERTY_DEPENDENCIES[property], dependentProperty)
-		end
-	end
+	class.DEPENDENCIES.Parent.__index = class.DEPENDENCIES.Parent
+	class.DEPENDENCIES.Self.__index = class.DEPENDENCIES.Self
+	class.DEPENDENCIES.Children.__index = class.DEPENDENCIES.Children
 	
 	if classPath then
 		local functionName = nil
 		local attributeName = nil
 		local attributeArguments = nil
 
-		for line in lovr.filesystem.lines(classPath) do
+		for line in string.gmatch(lovr.filesystem.read(classPath), "(.-)\n") do
 			local attribute, arguments = string.match(line, "%-%-%[%[%s*([%w_]+)%s*:?(.*)%s*%]%]%-%-")
 
 			if attribute then
@@ -97,12 +101,34 @@ function Class.CreateClass(class, typeName, base, indexMetamethod, newIndexMetam
 
 					if property then
 						for _, dependentProperty in pairs(attributeArguments) do
-							local dependents = class.PROPERTY_DEPENDENCIES[dependentProperty]
+							local dependents = nil
 
-							if not dependents then
-								dependents = {}
+							if dependentProperty ~= "Parent" and string.sub(dependentProperty, 1, 6) == "Parent" then
+								dependentProperty = string.sub(dependentProperty, 7)
+								dependents = class.DEPENDENCIES.Parent[dependentProperty]
 
-								class.PROPERTY_DEPENDENCIES[dependentProperty] = dependents
+								if not dependents then
+									dependents = {}
+
+									class.DEPENDENCIES.Parent[dependentProperty] = dependents
+								end
+							elseif dependentProperty ~= "Children" and string.sub(dependentProperty, 1, 8) == "Children" then
+								dependentProperty = string.sub(dependentProperty, 9)
+								dependents = class.DEPENDENCIES.Children[dependentProperty]
+
+								if not dependents then
+									dependents = {}
+
+									class.DEPENDENCIES.Children[dependentProperty] = dependents
+								end
+							else
+								dependents = class.DEPENDENCIES.Self[dependentProperty]
+
+								if not dependents then
+									dependents = {}
+
+									class.DEPENDENCIES.Self[dependentProperty] = dependents
+								end
 							end
 
 							table.insert(dependents, property)

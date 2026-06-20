@@ -8,22 +8,36 @@ local function NewIndexMetamethod(self, name, value)
 		local set, setValue = setter(self, value)
 		
 		if set or value == Class.NIL then
-			local dependents = self.Class.PROPERTY_DEPENDENCIES[name]
-			
-			if dependents then
-				for _, dependency in pairs(dependents) do
-					self[dependency] = Class.NIL
+			local selfDependents = self.Class.DEPENDENCIES.Self[name] or table.empty
+
+			for _, dependency in ipairs(selfDependents) do
+				self[dependency] = Class.NIL
+			end
+
+			if self._Parent then
+				local parentDependents = self._Parent.Class.DEPENDENCIES.Children[name] or table.empty
+
+				for _, dependency in ipairs(parentDependents) do
+					self._Parent[dependency] = Class.NIL
+				end
+			end
+
+			for _, child in ipairs(self._Children) do
+				local childDependents = child.Class.DEPENDENCIES.Parent[name] or table.empty
+
+				for _, dependency in ipairs(childDependents) do
+					child[dependency] = Class.NIL
 				end
 			end
 
 			if not self.Destroyed then
 				self.Events:Trigger(name.."Changed", setValue, oldValue) 
 
-				if self.Parent then
-					self.Parent.Events:Trigger("Child"..name.."Changed", setValue, oldValue)
+				if self._Parent then
+					self._Parent.Events:Trigger("Child"..name.."Changed", self, setValue, oldValue)
 				end
 
-				self.Events:TriggerChildren("Parent"..name.."Changed", self, setValue, oldValue)
+				self.Events:TriggerChildren("Parent"..name.."Changed", setValue, oldValue)
 			end
 		end
 	else
@@ -167,8 +181,8 @@ function Hierarchy:IsDescendantOf(ancestor)
 end
 
 function Hierarchy:DestroyChildren()
-	while #self.Children > 0 do
-		local child = self.Children[1]
+	while #self._Children > 0 do
+		local child = table.remove(self._Children)
 
 		child.Parent = nil
 		child:Destroy()
@@ -185,4 +199,4 @@ function Hierarchy:Destroy()
 	end
 end
 
-return Class.CreateClass(Hierarchy, "Hierarchy", Object, nil, NewIndexMetamethod)
+return Class.CreateClass(Hierarchy, "Hierarchy", Object, nil, nil, NewIndexMetamethod)

@@ -64,22 +64,22 @@ function Matrix4.CreateTransform(position, orientation, size, origin)
 
 	-- Combined origin offset and size matrix
 	local result = Matrix4.Create({
-		size.X, 0, 0, -origin.X,
-		0, size.Y, 0, -origin.Y,
-		0, 0, size.Z, -origin.Z,
-		0, 0, 0, 1
+		size.X, 0, 0, 0,
+		0, size.Y, 0, 0,
+		0, 0, size.Z, 0,
+		-origin.X, -origin.Y, -origin.Z, 1
 	})
 
 	if orientation ~= Quaternion.One then
-		result = orientation:ConvertToRotationMatrix() * result
+		result = orientation:ConvertToMatrix() * result
 	end
 
 	if position ~= Vector3.Zero then
 		result = Matrix4.Create({
-			1, 0, 0, position.X,
-			0, 1, 0, position.Y,
-			0, 0, 1, position.Z,
-			0, 0, 0, 1
+			1, 0, 0, 0,
+			0, 1, 0, 0,
+			0, 0, 1, 0,
+			position.X, position.Y, position.Z, 1
 		}) * result
 	end
 
@@ -88,10 +88,10 @@ end
 
 function Matrix4.CreateInterfaceProjection(width, height)
 	return Matrix4.Create({
-		2 / width, 0, 0, -1,
-		0, -2 / height, 0, 1,
+		2 / width, 0, 0, 0,
+		0, 2 / height, 0, 0,
 		0, 0, 0, 0,
-		0, 0, 0, 1
+		-1, -1, 0, 1
 	})
 end
 
@@ -101,8 +101,8 @@ function Matrix4.CreatePerspectiveProjection(aspectRatio, fov, near, far)
 	return Matrix4.Create({
 		inverseTanOfHalfFOV / aspectRatio, 0, 0, 0,
 		0, inverseTanOfHalfFOV, 0, 0,
-		0, 0, (far + near) / (far - near), (-2 * far * near) / (far - near),
-		0, 0, 1, 0
+		0, 0, (far + near) / (near - far), -1,
+		0, 0, (2*far*near) / (near - far), 0
 	})
 end
 
@@ -118,41 +118,60 @@ function Matrix4:Transpose()
 end
 
 function Matrix4:Inverse()
-	local a00,a01,a02,a03,a10,a11,a12,a13,a20,a21,a22,a23,a30,a31,a32,a33 = unpack(self.Components)
+	local m = self.Components
 
-	local b00 = a00*a11 - a01*a10
-    local b01 = a00*a12 - a02*a10
-    local b02 = a00*a13 - a03*a10
-    local b03 = a01*a12 - a02*a11
-    local b04 = a01*a13 - a03*a11
-    local b05 = a02*a13 - a03*a12
-    local b06 = a20*a31 - a21*a30
-    local b07 = a20*a32 - a22*a30
-    local b08 = a20*a33 - a23*a30
-    local b09 = a21*a32 - a22*a31
-    local b10 = a21*a33 - a23*a31
-    local b11 = a22*a33 - a23*a32
+    local m11, m12, m13, m14 = m[1],  m[2],  m[3],  m[4]
+    local m21, m22, m23, m24 = m[5],  m[6],  m[7],  m[8]
+    local m31, m32, m33, m34 = m[9],  m[10], m[11], m[12]
+    local m41, m42, m43, m44 = m[13], m[14], m[15], m[16]
 
-	local invDet = 1 / (b00*b11 - b01*b10 + b02*b09 + b03*b08 - b04*b07 + b05*b06)
+    local A2323 = m33 * m44 - m34 * m43
+    local A1323 = m32 * m44 - m34 * m42
+    local A1223 = m32 * m43 - m33 * m42
+    local A0323 = m31 * m44 - m34 * m41
+    local A0223 = m31 * m43 - m33 * m41
+    local A0123 = m31 * m42 - m32 * m41
+    local A2313 = m23 * m44 - m24 * m43
+    local A1313 = m22 * m44 - m24 * m42
+    local A1213 = m22 * m43 - m23 * m42
+    local A2312 = m23 * m34 - m24 * m33
+    local A1312 = m22 * m34 - m24 * m32
+    local A1212 = m22 * m33 - m23 * m32
+    local A0313 = m21 * m44 - m24 * m41
+    local A0213 = m21 * m43 - m23 * m41
+    local A0312 = m21 * m34 - m24 * m31
+    local A0212 = m21 * m33 - m23 * m31
+    local A0113 = m21 * m42 - m22 * m41
+    local A0112 = m21 * m32 - m22 * m31
 
-	return Matrix4.Create({
-		( a11*b11 - a12*b10 + a13*b09) * invDet,
-		(-a01*b11 + a02*b10 - a03*b09) * invDet,
-    	( a31*b05 - a32*b04 + a33*b03) * invDet,
-    	(-a21*b05 + a22*b04 - a23*b03) * invDet,
-    	(-a10*b11 + a12*b08 - a13*b07) * invDet,
-    	( a00*b11 - a02*b08 + a03*b07) * invDet,
-    	(-a30*b05 + a32*b02 - a33*b01) * invDet,
-    	( a20*b05 - a22*b02 + a23*b01) * invDet,
-    	( a10*b10 - a11*b08 + a13*b06) * invDet,
-    	(-a00*b10 + a01*b08 - a03*b06) * invDet,
-    	( a30*b04 - a31*b02 + a33*b00) * invDet,
-    	(-a20*b04 + a21*b02 - a23*b00) * invDet,
-    	(-a10*b09 + a11*b07 - a12*b06) * invDet,
-    	( a00*b09 - a01*b07 + a02*b06) * invDet,
-    	(-a30*b03 + a31*b01 - a32*b00) * invDet,
-    	( a20*b03 - a21*b01 + a22*b00) * invDet
-	})
+    local det = m11 * ( m22 * A2323 - m23 * A1323 + m24 * A1223 )
+              - m12 * ( m21 * A2323 - m23 * A0323 + m24 * A0223 )
+              + m13 * ( m21 * A1323 - m22 * A0323 + m24 * A0123 )
+              - m14 * ( m21 * A1223 - m22 * A0223 + m23 * A0123 )
+
+    local invDet = 1 / det
+
+    return Matrix4.Create({
+        invDet * ( m22 * A2323 - m23 * A1323 + m24 * A1223 ),
+        invDet * -( m12 * A2323 - m13 * A1323 + m14 * A1223 ),
+        invDet * ( m12 * A2313 - m13 * A1313 + m14 * A1213 ),
+        invDet * -( m12 * A2312 - m13 * A1312 + m14 * A1212 ),
+
+        invDet * -( m21 * A2323 - m23 * A0323 + m24 * A0223 ),
+        invDet * ( m11 * A2323 - m13 * A0323 + m14 * A0223 ),
+        invDet * -( m11 * A2313 - m13 * A0313 + m14 * A0213 ),
+        invDet * ( m11 * A2312 - m13 * A0312 + m14 * A0212 ),
+
+        invDet * ( m21 * A1323 - m22 * A0323 + m24 * A0123 ),
+        invDet * -( m11 * A1323 - m12 * A0323 + m14 * A0123 ),
+        invDet * ( m11 * A1313 - m12 * A0313 + m14 * A0113 ),
+        invDet * -( m11 * A1312 - m12 * A0312 + m14 * A0112 ),
+
+        invDet * -( m21 * A1223 - m22 * A0223 + m23 * A0123 ),
+        invDet * ( m11 * A1223 - m12 * A0223 + m13 * A0123 ),
+        invDet * -( m11 * A1213 - m12 * A0213 + m13 * A0113 ),
+        invDet * ( m11 * A1212 - m12 * A0212 + m13 * A0112 )
+    })
 end
 
 function Matrix4:Unpack()
@@ -167,44 +186,44 @@ function Matrix4.__mul(leftMatrix, rightMatrix)
 		local right = rightMatrix.Components
 
 		return Matrix4.Create({
-			-- Row 1
-			left[1]*right[1]  + left[2]*right[5]  + left[3]*right[9]  + left[4]*right[13],
-			left[1]*right[2]  + left[2]*right[6]  + left[3]*right[10] + left[4]*right[14],
-			left[1]*right[3]  + left[2]*right[7]  + left[3]*right[11] + left[4]*right[15],
-			left[1]*right[4]  + left[2]*right[8]  + left[3]*right[12] + left[4]*right[16],
+			-- Column 1
+            left[1]*right[1]  + left[5]*right[2]  + left[9]*right[3]  + left[13]*right[4],
+            left[2]*right[1]  + left[6]*right[2]  + left[10]*right[3] + left[14]*right[4],
+            left[3]*right[1]  + left[7]*right[2]  + left[11]*right[3] + left[15]*right[4],
+            left[4]*right[1]  + left[8]*right[2]  + left[12]*right[3] + left[16]*right[4],
 
-			-- Row 2
-			left[5]*right[1]  + left[6]*right[5]  + left[7]*right[9]  + left[8]*right[13],
-			left[5]*right[2]  + left[6]*right[6]  + left[7]*right[10] + left[8]*right[14],
-			left[5]*right[3]  + left[6]*right[7]  + left[7]*right[11] + left[8]*right[15],
-			left[5]*right[4]  + left[6]*right[8]  + left[7]*right[12] + left[8]*right[16],
+            -- Column 2
+            left[1]*right[5]  + left[5]*right[6]  + left[9]*right[7]  + left[13]*right[8],
+            left[2]*right[5]  + left[6]*right[6]  + left[10]*right[7] + left[14]*right[8],
+            left[3]*right[5]  + left[7]*right[6]  + left[11]*right[7] + left[15]*right[8],
+            left[4]*right[5]  + left[8]*right[6]  + left[12]*right[7] + left[16]*right[8],
 
-			-- Row 3
-			left[9]*right[1]  + left[10]*right[5]  + left[11]*right[9]  + left[12]*right[13],
-			left[9]*right[2]  + left[10]*right[6]  + left[11]*right[10] + left[12]*right[14],
-			left[9]*right[3]  + left[10]*right[7]  + left[11]*right[11] + left[12]*right[15],
-			left[9]*right[4]  + left[10]*right[8]  + left[11]*right[12] + left[12]*right[16],
+            -- Column 3
+            left[1]*right[9]  + left[5]*right[10] + left[9]*right[11] + left[13]*right[12],
+            left[2]*right[9]  + left[6]*right[10] + left[10]*right[11] + left[14]*right[12],
+            left[3]*right[9]  + left[7]*right[10] + left[11]*right[11] + left[15]*right[12],
+            left[4]*right[9]  + left[8]*right[10] + left[12]*right[11] + left[16]*right[12],
 
-			-- Row 4
-			left[13]*right[1]  + left[14]*right[5]  + left[15]*right[9]  + left[16]*right[13],
-			left[13]*right[2]  + left[14]*right[6]  + left[15]*right[10] + left[16]*right[14],
-			left[13]*right[3]  + left[14]*right[7]  + left[15]*right[11] + left[16]*right[15],
-			left[13]*right[4]  + left[14]*right[8]  + left[15]*right[12] + left[16]*right[16],
+            -- Column 4
+            left[1]*right[13] + left[5]*right[14] + left[9]*right[15] + left[13]*right[16],
+            left[2]*right[13] + left[6]*right[14] + left[10]*right[15] + left[14]*right[16],
+            left[3]*right[13] + left[7]*right[14] + left[11]*right[15] + left[15]*right[16],
+            left[4]*right[13] + left[8]*right[14] + left[12]*right[15] + left[16]*right[16],
 		})
 	elseif rightMatrixType == "Vector3" then
 		x, y, z = rightMatrix:Unpack()
 
 		return Vector3.Create(
-			left[1]*x + left[2]*y + left[3]*z + left[4],
-        	left[5]*x + left[6]*y + left[7]*z + left[8],
-        	left[9]*x + left[10]*y + left[11]*z + left[12]
+			left[1]*x + left[5]*y + left[9]*z + left[13],
+        	left[2]*x + left[6]*y + left[10]*z + left[14],
+        	left[3]*x + left[7]*y + left[11]*z + left[15]
 		)
 	elseif rightMatrixType == "Vector2" then
 		x, y = rightMatrix:Unpack()
 
 		return Vector2.Create(
-			left[1]*x + left[2]*y + left[4],
-        	left[5]*x + left[6]*y + left[8]
+			left[1]*x + left[5]*y + left[13],
+        	left[2]*x + left[6]*y + left[14]
 		)
 	elseif rightMatrixType == "number" then
 		return Matrix4.Create({
@@ -228,9 +247,14 @@ function Matrix4.__eq(leftMatrix, rightMatrix)
 end
 
 function Matrix4.__tostring(matrix)
+	local components = matrix.Components
+
 	return string.format(
 		"\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n",
-		unpack(matrix.Components)
+		components[1], components[5], components[9], components[13],
+		components[2], components[6], components[10], components[14],
+		components[3], components[7], components[11], components[15],
+		components[4], components[8], components[12], components[16]
 	)
 end
 
@@ -239,4 +263,4 @@ Class.CreateClass(Matrix4, "Matrix4")
 Matrix4.Zero = Matrix4.Create()
 Matrix4.Identity = Matrix4.CreateIdentity()
 
-return Class.CreateClass(Matrix4, "Matrix4")
+return Matrix4

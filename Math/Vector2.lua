@@ -148,4 +148,4 @@ Vector2.Down = Vector2.Create(0, -1)
 Vector2.Left = Vector2.Create(-1, 0)
 Vector2.Right = Vector2.Create(1, 0)
 
-return Class.CreateClass(Vector2, "Vector2")
+return Vector2

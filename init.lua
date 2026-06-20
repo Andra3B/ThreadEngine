@@ -69,13 +69,20 @@ EventListener = require("EventListener")
 Vector2 = require("Math.Vector2")
 Vector3 = require("Math.Vector3")
 Vector4 = require("Math.Vector4")
+ScaleOffset = require("Math.ScaleOffset")
+ScaleOffset2 = require("Math.ScaleOffset2")
+ScaleOffset3 = require("Math.ScaleOffset3")
+ScaleOffset4 = require("Math.ScaleOffset4")
 Quaternion = require("Math.Quaternion")
 Matrix4 = require("Math.Matrix4")
 
 Timer = require("Timer")
 Input = require("Input")
 
+InterfaceObject = require("Interface.InterfaceObject")
 Interface = require("Interface.Interface")
+Frame = require("Interface.Frame")
+Label = require("Interface.Label")
 
 local MOUSE_INPUTS = {
 	"m_leftmousebutton",
@@ -100,7 +107,14 @@ Thread = {}
 
 Thread.Events = nil
 
+Thread.Interface = nil
+
+Thread.Shaders = {}
 Thread.Meshes = {}
+
+local function LovrResourceRelease(resource)
+	resource:release()
+end
 
 local function ThreadQuit(exitCode)
 	Thread.Quit(exitCode)
@@ -108,7 +122,11 @@ local function ThreadQuit(exitCode)
 	Timer.DestroyTimers()
 	Input.DestroyInputs()
 
-	table.erase(Thread.Meshes, function(mesh) mesh:release() end)
+	table.erase(Thread.Shaders, LovrResourceRelease)
+	table.erase(Thread.Meshes, LovrResourceRelease)
+
+	Thread.Interface:Destroy()
+	Thread.Interface = nil
 
 	Thread.Events:Destroy()
 	Thread.Events = nil
@@ -132,14 +150,32 @@ function lovr.errhand(message)
 	ThreadQuit(1)
 end
 
+function lovr.resize(width, height)
+	Thread.Interface.AbsoluteSize = Vector2.Create(width, height)
+	Thread.Interface.Projection = Matrix4.CreateInterfaceProjection(width, height)
+end
+
 function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
-
+	Thread.Interface = Interface.Create()
+	
 	engineOptions = Thread.Load() or DEFAULT_ENGINE_OPTIONS
 
 	lovr.system.openWindow(engineOptions.Window or DEFAULT_ENGINE_OPTIONS.Window)
-
+	
 	lovr.graphics.setBackgroundColor(0, 0, 0, 1)
+
+	local windowPass = lovr.graphics.getWindowPass()
+	
+	windowPass:setWinding("counterclockwise")
+	windowPass:setDepthTest("none")
+	windowPass:setDepthWrite(false)
+
+	Thread.Shaders.Interface = lovr.graphics.newShader(
+		"Assets/Shaders/Interface.vert",
+		"Assets/Shaders/Interface.frag",
+		{label = "Interface"}
+	)
 
 	Thread.Meshes.Square = lovr.graphics.newMesh({
 		{name = "VertexPosition", type = "vec2"},
@@ -157,6 +193,8 @@ function lovr.run()
 		1, 2, 3,
 		1, 3, 4
 	})
+
+	lovr.resize(lovr.system.getWindowDimensions())
 
 	lovr.timer.step()
 	return function()
@@ -181,9 +219,13 @@ function lovr.run()
 		
 		Thread.Update(deltaTime)
 
-		local window = lovr.graphics.getWindowPass()
+		local windowPass = lovr.graphics.getWindowPass()
 
-		lovr.graphics.submit(window)
+		windowPass:push("state")
+		Thread.Interface:Draw(windowPass)
+		windowPass:pop("state")
+
+		lovr.graphics.submit(windowPass)
 		lovr.graphics.present()
 	end
 end
