@@ -79,6 +79,13 @@ Matrix4 = require("Math.Matrix4")
 Timer = require("Timer")
 Input = require("Input")
 
+WorldObject = require("World.WorldObject")
+World = require("World.World")
+WorldNode = require("World.WorldNode")
+Model = require("World.Model")
+Body = require("World.Body")
+Camera = require("World.Camera")
+
 InterfaceObject = require("Interface.InterfaceObject")
 Interface = require("Interface.Interface")
 Frame = require("Interface.Frame")
@@ -107,6 +114,7 @@ Thread = {}
 
 Thread.Events = nil
 
+Thread.World = nil
 Thread.Interface = nil
 
 Thread.Shaders = {}
@@ -127,6 +135,9 @@ local function ThreadQuit(exitCode)
 
 	Thread.Interface:Destroy()
 	Thread.Interface = nil
+
+	Thread.World:Destroy()
+	Thread.World = nil
 
 	Thread.Events:Destroy()
 	Thread.Events = nil
@@ -151,12 +162,17 @@ function lovr.errhand(message)
 end
 
 function lovr.resize(width, height)
-	Thread.Interface.AbsoluteSize = Vector2.Create(width, height)
+	if Thread.World.Camera then
+		Thread.World.Camera.Projection = Class.NIL
+	end
+
+	Thread.Interface.Size = ScaleOffset2.Create(0, 0, width, height)
 	Thread.Interface.Projection = Matrix4.CreateInterfaceProjection(width, height)
 end
 
 function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
+	Thread.World = World.Create()
 	Thread.Interface = Interface.Create()
 	
 	engineOptions = Thread.Load() or DEFAULT_ENGINE_OPTIONS
@@ -167,14 +183,23 @@ function lovr.run()
 
 	local windowPass = lovr.graphics.getWindowPass()
 	
-	windowPass:setWinding("counterclockwise")
 	windowPass:setDepthTest("none")
 	windowPass:setDepthWrite(false)
+
+	windowPass:setFaceCull("none")
+	
+	windowPass:setWinding("counterclockwise")
 
 	Thread.Shaders.Interface = lovr.graphics.newShader(
 		"Assets/Shaders/Interface.vert",
 		"Assets/Shaders/Interface.frag",
 		{label = "Interface"}
+	)
+
+	Thread.Shaders.World = lovr.graphics.newShader(
+		"Assets/Shaders/World.vert",
+		"Assets/Shaders/World.frag",
+		{label = "World"}
 	)
 
 	Thread.Meshes.Square = lovr.graphics.newMesh({
@@ -219,7 +244,14 @@ function lovr.run()
 		
 		Thread.Update(deltaTime)
 
+		Thread.World:Update(deltaTime)
+		Thread.Interface:Update(deltaTime)
+
 		local windowPass = lovr.graphics.getWindowPass()
+
+		windowPass:push("state")
+		Thread.World:Draw(windowPass)
+		windowPass:pop("state")
 
 		windowPass:push("state")
 		Thread.Interface:Draw(windowPass)

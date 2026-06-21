@@ -11,7 +11,7 @@ function Thread.Load()
 	label.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
 	label.VerticalTextAlignment = Enum.VerticalAlignment.Middle
 	
-	label.CornerRadius = ScaleOffset4.Create(0.5, 0, 0.5, 0, 0, 0, 0, 0)
+	label.CornerRadius = ScaleOffset4.Create(1, 0, 1, 0, 0, 0, 0, 0)
 
 	label.Text = "Hello, world!"
 

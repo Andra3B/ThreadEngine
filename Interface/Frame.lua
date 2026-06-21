@@ -3,20 +3,12 @@ local Frame = {}
 function Frame.Create()
     local self = Class.CreateInstance(InterfaceObject.Create(), Frame)
 
-    self._Position = ScaleOffset2.Zero
     self._AbsolutePosition = Class.NIL
-
-    self._Size = ScaleOffset2.Zero
     self._AbsoluteSize = Class.NIL
+    self._AbsoluteAngle = Class.NIL
 
     self._Origin = ScaleOffset2.Zero
     self._AbsoluteOrigin = Class.NIL
-
-    self._Angle = 0
-    self._AbsoluteAngle = Class.NIL
-
-    self._Transform = Class.NIL
-    self._InverseTransform = Class.NIL
 
     -- CornerRadius Format: (top-left, top-right, bottom-right, bottom-left)
     self._CornerRadius = ScaleOffset4.Zero
@@ -61,16 +53,12 @@ function Frame:GetAbsolutePosition()
     return self._AbsolutePosition
 end
 
-function Frame:GetPosition()
-    return self._Position
-end
-
-function Frame:SetPosition(position)
-    if position ~= self._Position then
-        self._Position = position
-
-        return true, position
-    end
+function Frame:SetAbsolutePosition(position)
+	if position ~= self._AbsolutePosition then
+		self._AbsolutePosition = position
+		
+		return true, position
+	end
 end
 
 --[[DependsOn: Size, Parent, ParentAbsoluteSize]]--
@@ -86,28 +74,12 @@ function Frame:GetAbsoluteSize()
     return self._AbsoluteSize
 end
 
-function Frame:GetSize()
-    return self._Size
-end
+function Frame:SetAbsoluteSize(size)
+	if size ~= self._Size then
+		self._Size = size
 
-function Frame:SetSize(size)
-    if size ~= self._Size then
-        self._Size = size
-
-        return true, size
-    end
-end
-
-function Frame:GetAngle()
-    return self._Angle
-end
-
-function Frame:SetAngle(angle)
-    if angle ~= self._Angle then
-        self._Angle = angle
-
-        return true, angle
-    end
+		return true, size
+	end
 end
 
 --[[DependsOn: Angle, Parent, ParentAbsoluteAngle]]--
@@ -121,6 +93,14 @@ function Frame:GetAbsoluteAngle()
     end
 
     return self._AbsoluteAngle
+end
+
+function Frame:SetAbsoluteAngle(angle)
+	if angle ~= self._AbsoluteAngle then
+		self._AbsoluteAngle = angle
+
+		return true, angle
+	end
 end
 
 function Frame:GetOrigin()
@@ -149,45 +129,6 @@ function Frame:SetAbsoluteOrigin(origin)
         self._AbsoluteOrigin = origin
 
         return true, origin
-    end
-end
-
---[[DependsOn: AbsolutePosition, AbsoluteAngle]]--
-function Frame:GetTransform()
-	if self._Transform == Class.NIL then
-		self._Transform = Matrix4.CreateTransform(
-            Vector3.Create(self.AbsolutePosition.X, self.AbsolutePosition.Y, 0),
-            Vector3.Create(0, 0, self.AbsoluteAngle),
-            Vector3.One,
-            Vector3.Zero
-        )
-	end
-
-	return self._Transform
-end
-
-function Frame:SetTransform(transform)
-	if transform ~= self._Transform then
-		self._Transform = transform
-
-		return true, transform
-	end
-end
-
---[[DependsOn: Transform]]--
-function Frame:GetInverseTransform()
-    if self._InverseTransform == Class.NIL then
-        self._InverseTransform = self.Transform:Inverse()
-    end
-
-    return self._InverseTransform
-end
-
-function Frame:SetInverseTransform(inverse)
-    if inverse ~= self._InverseTransform then
-        self._InverseTransform = inverse
-
-        return true, inverse
     end
 end
 
@@ -258,14 +199,11 @@ end
 
 function Frame:Destroy()
     if not self._Destroyed then
-        self._Position = nil
-        self._Size = nil
+        self._AbsolutePosition = nil
+        self._AbsoluteSize = nil
 
         self._Origin = nil
         self._AbsoluteOrigin = nil
-
-        self._Transform = nil
-        self._InverseTransform = nil
 
         self._CornerRadius = nil
         self._AbsoluteCornerRadius = nil

@@ -11,9 +11,7 @@ end
 function Interface:Draw(pass)
 	if self._Visible then
 		pass:setShader(Thread.Shaders.Interface)
-		pass:setProjection("orthographic")
-
-		pass:send("InterfaceProjection", self._Projection.Components)
+		pass:setProjection("matrix", self._Projection:Unpack())
 
 		for _, child in ipairs(self:GetDrawOrder()) do
 			if child.Visible then

@@ -22,7 +22,7 @@ function Label.Create()
 
 	self._AbsoluteTextPosition = Class.NIL
 
-	self._TextSize = ScaleOffset.Create(0, 32)
+	self._TextSize = ScaleOffset.Create(0, 42)
 	self._AbsoluteTextSize = Class.NIL
 	
 	-- TextPadding Format: (left, top, right, bottom)

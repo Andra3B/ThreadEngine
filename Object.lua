@@ -35,7 +35,7 @@ function Object.Create()
 	return self
 end
 
-function Object:Update(deltaTime)
+function Object:Update()
 	self._Events:Update()
 end
 
