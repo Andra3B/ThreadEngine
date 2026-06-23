@@ -199,7 +199,9 @@ function lovr.run()
 	Thread.Shaders.World = lovr.graphics.newShader(
 		"Assets/Shaders/World.vert",
 		"Assets/Shaders/World.frag",
-		{label = "World"}
+		{label = "World", flags = {
+			tonemap = true
+		}}
 	)
 
 	Thread.Meshes.Square = lovr.graphics.newMesh({

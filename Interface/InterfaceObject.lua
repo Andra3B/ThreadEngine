@@ -95,11 +95,11 @@ function InterfaceObject:GetAbsoluteSize()
 	return self._Size.Offset
 end
 
-function Interface:GetAngle()
+function InterfaceObject:GetAngle()
 	return self._Angle
 end
 
-function Interface:SetAngle(angle)
+function InterfaceObject:SetAngle(angle)
 	if angle ~= self._Angle then
 		self._Angle = angle
 
@@ -112,7 +112,7 @@ function InterfaceObject:GetAbsoluteAngle()
 end
 
 --[[DependsOn: Position, Angle]]--
-function Frame:GetTransform()
+function InterfaceObject:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
             Vector3.Create(self.AbsolutePosition.X, self.AbsolutePosition.Y, 0),
@@ -125,7 +125,7 @@ function Frame:GetTransform()
 	return self._Transform
 end
 
-function Frame:SetTransform(transform)
+function InterfaceObject:SetTransform(transform)
 	if transform ~= self._Transform then
 		self._Transform = transform
 
@@ -134,7 +134,7 @@ function Frame:SetTransform(transform)
 end
 
 --[[DependsOn: Transform]]--
-function Frame:GetInverseTransform()
+function InterfaceObject:GetInverseTransform()
     if self._InverseTransform == Class.NIL then
         self._InverseTransform = self.Transform:Inverse()
     end
@@ -142,7 +142,7 @@ function Frame:GetInverseTransform()
     return self._InverseTransform
 end
 
-function Frame:SetInverseTransform(inverse)
+function InterfaceObject:SetInverseTransform(inverse)
     if inverse ~= self._InverseTransform then
         self._InverseTransform = inverse
 

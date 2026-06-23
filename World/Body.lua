@@ -9,12 +9,7 @@ function Body.Create()
 end
 
 function Body:Draw(pass)
-	if self._Mesh then
-		pass:send("WorldTransform", self.Transform.Components)
-		pass:send("InverseWorldTransform", self.InverseTransform.Components)
-
-		
-	end
+	
 end
 
 function Body:GetMesh()

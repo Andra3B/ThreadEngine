@@ -23,8 +23,7 @@ function Frame.Create()
 end
 
 function Frame:Draw(pass)
-    pass:send("InterfaceTransform", self.Transform.Components)
-    pass:send("InverseInterfaceTransform", self.InverseTransform.Components)
+    pass:send("InverseTransform", self.InverseTransform.Components)
 
     pass:send("Size", {self.AbsoluteSize:Unpack()})
 
@@ -32,7 +31,9 @@ function Frame:Draw(pass)
     pass:send("BorderSize", self._BorderSize)
     pass:send("BorderColour", {self._BorderColour:Unpack()})
 
-    pass:send("BackgroundColour", {self._BackgroundColour:Unpack()})
+	pass:transform(self.Transform.Components)
+
+	pass:setColor(self._BackgroundColour:Unpack())
 
     pass:draw(Thread.Meshes.Square)
 end
