@@ -1,27 +1,41 @@
 require("init")
 
 function Thread.Load()
-	label = Label.Create()
+	cube = Body.Create()	
+	fps = Label.Create()
 
-	label.Name = "Label 1"
+	fps.Name = "FPS Label"
 
-	label.Size = ScaleOffset2.Create(0.3, 0.3, 0, 0)
-	label.Position = ScaleOffset2.Create(0.5, 0.5, 0, 0)
-	label.Origin = ScaleOffset2.Create(0.5, 0.5, 0, 0)
-	label.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
-	label.VerticalTextAlignment = Enum.VerticalAlignment.Middle
-	
-	label.CornerRadius = ScaleOffset4.Create(1, 0, 1, 0, 0, 0, 0, 0)
+	fps.Size = ScaleOffset2.Create(0, 0, 150, 50)
+	fps.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
+	fps.VerticalTextAlignment = Enum.VerticalAlignment.Middle
+	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 
-	label.Text = "Hello, world!"
+	cube.Position = Vector3.Create(0, 0, -3)
 
-	label.Parent = Thread.Interface
+	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
+	cameraMovement:SetMapping(Enum.Input.W, Vector3.Forward)
+	cameraMovement:SetMapping(Enum.Input.A, Vector3.Left)
+	cameraMovement:SetMapping(Enum.Input.S, Vector3.Backward)
+	cameraMovement:SetMapping(Enum.Input.D, Vector3.Right)
+	cameraMovement:SetMapping(Enum.Input.E, Vector3.Up)
+	cameraMovement:SetMapping(Enum.Input.Q, Vector3.Down)
+
+	cameraRotate = Input.Create("CameraRotate", Enum.InputPriority.Lowest)
+	cameraRotate:SetMapping(Enum.Input.RightMouseButton, Vector3.Forward)
+	cameraRotate:SetMapping(Enum.Input.MouseMovement)
+
+	cube.Parent = Thread.World
+	fps.Parent = Thread.Interface
 end
 
 function Thread.Update(deltaTime)
-	label.Angle = (label.Angle + 0.005) % (2 * math.pi)
-end
+	local camera = Thread.World.Camera
 
-function Thread.Quit(exitCode)
-	label:Destroy()
+	if cameraMovement.Direction ~= Vector3.Zero then
+		camera.Position = camera.Position + cameraMovement.Direction:Rotate(camera.Orientation):Normalise() * deltaTime
+		print(camera.Position)
+	end
+
+	fps.Text = string.format("FPS: %d", lovr.timer:getFPS())
 end

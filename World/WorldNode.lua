@@ -2,11 +2,7 @@ local WorldNode = {}
 
 function WorldNode.Create()
     local self = Class.CreateInstance(WorldObject.Create(), WorldNode)
-
-    self._AbsolutePosition = Class.NIL
-    self._AbsoluteSize = Class.NIL
-    self._AbsoluteOrientation = Class.NIL
-
+	
     self._Origin = ScaleOffset3.Zero
     self._AbsoluteOrigin = Class.NIL
 
@@ -26,14 +22,6 @@ function WorldNode:GetAbsolutePosition()
     return self._AbsolutePosition
 end
 
-function WorldNode:SetAbsolutePosition(position)
-	if position ~= self._AbsolutePosition then
-		self._AbsolutePosition = position
-		
-		return true, position
-	end
-end
-
 --[[DependsOn: Orientation, Parent, ParentAbsoluteOrientation]]--
 function WorldNode:GetAbsoluteOrientation()
     if self._AbsoluteOrientation == Class.NIL then
@@ -45,14 +33,6 @@ function WorldNode:GetAbsoluteOrientation()
     end
 
     return self._AbsoluteOrientation
-end
-
-function WorldNode:SetAbsoluteOrientation(orientation)
-	if orientation ~= self._AbsoluteOrientation then
-		self._AbsoluteOrientation = orientation
-
-		return true, orientation
-	end
 end
 
 function WorldNode:GetOrigin()

@@ -3,7 +3,7 @@ vec4 lovrmain() {
 
 	Surface surface = getDefaultSurface();
 
-	colour += getLighting(surface, PositionWorld - vec3(1, 1, 1), vec4(1, 1, 1, 1), 1.0);
+	colour += getLighting(surface, vec3(0, 2, 0) - PositionWorld, vec4(1, 1, 1, 1), 1.0);
 
 	return vec4(colour, 1.0);
 }

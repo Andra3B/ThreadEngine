@@ -156,9 +156,9 @@ function Input.TriggerInput(input, direction, invert)
 
 					if invert == nil then
 						inputObject.Direction = Vector3.Create(
-							direction.x or inputObject._Direction.x,
-							direction.z or inputObject._Direction.z,
-							direction.z or inputObject._Direction.z
+							direction.X or inputObject._Direction.X,
+							direction.Y or inputObject._Direction.Y,
+							direction.Z or inputObject._Direction.Z
 						)
 					else
 						inputObject.Direction = inputObject._Direction + (invert and -direction or direction)

@@ -14,6 +14,20 @@ table.erase = function(tab, cleanupCallback, recurse)
 	end
 end
 
+table.clone = function(tab, cloneCallback)
+	local clonedTable = {}
+
+	for key, value in pairs(tab) do
+		if Class.GetType(value) == "table" then
+			clonedTable[key] = table.clone(value, cloneCallback)
+		else
+			clonedTable[key] = cloneCallback and cloneCallback(value) or value
+		end
+	end
+
+	return clonedTable
+end
+
 string.replace = function(str, from, to, with)
 	if to >= #str then
 		return string.sub(str, 1, from - 1)..with
@@ -148,12 +162,12 @@ function Thread.Update(deltaTime) end
 function Thread.Quit(exitCode) end
 function Thread.Restart() end 
 
-function lovr.keypressed(key) Input.TriggerInput("k_"..key, Vector3.Backward, false) end
-function lovr.keyreleased(key) Input.TriggerInput("k_"..key, Vector3.Backward, true) end
+function lovr.keypressed(key) Input.TriggerInput("k_"..key, Vector3.Forward, false) end
+function lovr.keyreleased(key) Input.TriggerInput("k_"..key, Vector3.Forward, true) end
 function lovr.mousemoved(x, y, dx, dy) Input.TriggerInput("m_movement", Vector3.Create(dx, dy, nil)) end
 function lovr.wheelmoved(dx, dy) Input.TriggerInput("m_wheelmovement", Vector3.Create(dx, dy, nil)) end
-function lovr.mousepressed(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Backward, false) end
-function lovr.mousereleased(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Backward, true) end
+function lovr.mousepressed(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Forward, false) end
+function lovr.mousereleased(x, y, button) Input.TriggerInput(MOUSE_INPUTS[button], Vector3.Forward, true) end
 
 function lovr.errhand(message)
 	Log.Error("Thread", debug.traceback(tostring(message), 2):gsub("\n[^\n]+$", ""))
@@ -174,21 +188,6 @@ function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
 	Thread.World = World.Create()
 	Thread.Interface = Interface.Create()
-	
-	engineOptions = Thread.Load() or DEFAULT_ENGINE_OPTIONS
-
-	lovr.system.openWindow(engineOptions.Window or DEFAULT_ENGINE_OPTIONS.Window)
-	
-	lovr.graphics.setBackgroundColor(0, 0, 0, 1)
-
-	local windowPass = lovr.graphics.getWindowPass()
-	
-	windowPass:setDepthTest("none")
-	windowPass:setDepthWrite(false)
-
-	windowPass:setFaceCull("none")
-	
-	windowPass:setWinding("counterclockwise")
 
 	Thread.Shaders.Interface = lovr.graphics.newShader(
 		"Assets/Shaders/Interface.vert",
@@ -221,9 +220,84 @@ function lovr.run()
 		1, 3, 4
 	})
 
+	Thread.Meshes.Cube = lovr.graphics.newMesh({
+		{name = "VertexPosition", type = "vec3"},
+		{name = "VertexNormal", type = "vec3"},
+		{name = "VertexUV", type = "vec2"}
+	}, {
+		-- FRONT FACE (+Z) - Normal: 0, 0, 1
+        {-0.5, -0.5,  0.5,    0,  0,  1,    0.0, 1.0}, -- 1: Bottom-Left
+        { 0.5, -0.5,  0.5,    0,  0,  1,    1.0, 1.0}, -- 2: Bottom-Right
+        { 0.5,  0.5,  0.5,    0,  0,  1,    1.0, 0.0}, -- 3: Top-Right
+        {-0.5,  0.5,  0.5,    0,  0,  1,    0.0, 0.0}, -- 4: Top-Left
+
+        -- BACK FACE (-Z) - Normal: 0, 0, -1
+        { 0.5, -0.5, -0.5,    0,  0, -1,    0.0, 1.0}, -- 5: Bottom-Left (from back)
+        {-0.5, -0.5, -0.5,    0,  0, -1,    1.0, 1.0}, -- 6: Bottom-Right (from back)
+        {-0.5,  0.5, -0.5,    0,  0, -1,    1.0, 0.0}, -- 7: Top-Right (from back)
+        { 0.5,  0.5, -0.5,    0,  0, -1,    0.0, 0.0}, -- 8: Top-Left (from back)
+
+        -- LEFT FACE (-X) - Normal: -1, 0, 0
+        {-0.5, -0.5, -0.5,   -1,  0,  0,    0.0, 1.0}, -- 9: Bottom-Left
+        {-0.5, -0.5,  0.5,   -1,  0,  0,    1.0, 1.0}, -- 10: Bottom-Right
+        {-0.5,  0.5,  0.5,   -1,  0,  0,    1.0, 0.0}, -- 11: Top-Right
+        {-0.5,  0.5, -0.5,   -1,  0,  0,    0.0, 0.0}, -- 12: Top-Left
+
+        -- RIGHT FACE (+X) - Normal: 1, 0, 0
+        { 0.5, -0.5,  0.5,    1,  0,  0,    0.0, 1.0}, -- 13: Bottom-Left
+        { 0.5, -0.5, -0.5,    1,  0,  0,    1.0, 1.0}, -- 14: Bottom-Right
+        { 0.5,  0.5, -0.5,    1,  0,  0,    1.0, 0.0}, -- 15: Top-Right
+        { 0.5,  0.5,  0.5,    1,  0,  0,    0.0, 0.0}, -- 16: Top-Left
+
+        -- TOP FACE (+Y) - Normal: 0, 1, 0
+        {-0.5,  0.5,  0.5,    0,  1,  0,    0.0, 1.0}, -- 17: Bottom-Left
+        { 0.5,  0.5,  0.5,    0,  1,  0,    1.0, 1.0}, -- 18: Bottom-Right
+        { 0.5,  0.5, -0.5,    0,  1,  0,    1.0, 0.0}, -- 19: Top-Right
+        {-0.5,  0.5, -0.5,    0,  1,  0,    0.0, 0.0}, -- 20: Top-Left
+
+        -- BOTTOM FACE (-Y) - Normal: 0, -1, 0
+        {-0.5, -0.5, -0.5,    0, -1,  0,    0.0, 1.0}, -- 21: Bottom-Left
+        { 0.5, -0.5, -0.5,    0, -1,  0,    1.0, 1.0}, -- 22: Bottom-Right
+        { 0.5, -0.5,  0.5,    0, -1,  0,    1.0, 0.0}, -- 23: Top-Right
+        {-0.5, -0.5,  0.5,    0, -1,  0,    0.0, 0.0}  -- 24: Top-Left
+	}, {
+		storage = "gpu"
+	})
+
+	Thread.Meshes.Cube:setIndices({
+		-- Front face
+        1, 2, 3,    3, 4, 1,
+        -- Back face
+        5, 6, 7,    7, 8, 5,
+        -- Left face
+        9, 10, 11,  11, 12, 9,
+        -- Right face
+        13, 14, 15, 15, 16, 13,
+        -- Top face
+        17, 18, 19, 19, 20, 17,
+        -- Bottom face
+        21, 22, 23, 23, 24, 21
+	})
+	
+	engineOptions = Thread.Load() or DEFAULT_ENGINE_OPTIONS
+
+	lovr.system.openWindow(engineOptions.Window or DEFAULT_ENGINE_OPTIONS.Window)
+	
+	lovr.graphics.setBackgroundColor(0, 0, 0, 1)
+
+	local windowPass = lovr.graphics.getWindowPass()
+	
+	windowPass:setDepthTest("none")
+	windowPass:setDepthWrite(false)
+
+	windowPass:setFaceCull("none")
+	
+	windowPass:setWinding("counterclockwise")
+
 	lovr.resize(lovr.system.getWindowDimensions())
 
 	lovr.timer.step()
+
 	return function()
 		lovr.system.pollEvents()
 
@@ -250,7 +324,7 @@ function lovr.run()
 		Thread.Interface:Update(deltaTime)
 
 		local windowPass = lovr.graphics.getWindowPass()
-
+		
 		windowPass:push("state")
 		Thread.World:Draw(windowPass)
 		windowPass:pop("state")

@@ -10,8 +10,6 @@ function Camera.Create()
 
 	self._Projection = Class.NIL
 
-	self._LovrInverseTransform = Class.NIL
-
 	return self
 end
 
@@ -72,28 +70,9 @@ function Camera:SetProjection(projection)
 	end
 end
 
---[[DependsOn: InverseTransform]]--
-function Camera:GetLovrInverseTransform()
-	if self._LovrInverseTransform == Class.NIL then
-		self._LovrInverseTransform = lovr.math.newMat4(self.InverseTransform:Unpack())
-	end
-
-	return self._LovrInverseTransform
-end
-
-function Camera:SetLovrInverseTransform(transform)
-	if transform ~= self._LovrInverseTransform then
-		self._LovrInverseTransform = transform
-
-		return true, transform
-	end
-end
-
 function Camera:Destroy()
 	if not self._Destroyed then
 		self._Projection = nil
-
-		self._LovrInverseTransform = nil
 
 		WorldNode.Destroy(self)
 	end

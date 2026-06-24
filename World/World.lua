@@ -15,18 +15,20 @@ function World:Draw(pass)
 		pass:setShader(Thread.Shaders.World)
 		pass:setProjection("matrix", self._Camera.Projection:Unpack())
 		pass:setViewPose(1, self._Camera.LovrInverseTransform, true)
-		
+
 		pass:setDepthTest("gequal")
 		pass:setDepthWrite(true)
 
-		pass:setFaceCull("back")
+		pass:setFaceCull("front")
 
 		pass:setColor(1, 1, 1, 1)
 
-		for _, descendant in self:IterateDescendants() do
+		for descendant in self:IterateDescendants() do
 			if Class.IsA(descendant, "Body") then
 				if descendant.Mesh then
-					descendant:Draw()
+					pass:push("state")
+					descendant:Draw(pass)
+					pass:pop("state")
 				end
 			end
 		end

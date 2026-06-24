@@ -4,11 +4,17 @@ function InterfaceObject.Create()
 	local self = Class.CreateInstance(Hierarchy.Create(), InterfaceObject)
 
 	self._Position = ScaleOffset2.Zero
+	self._AbsolutePosition = Class.NIL
+
 	self._Size = ScaleOffset2.Zero
+	self._AbsoluteSize = Class.NIL
+
     self._Angle = 0
+	self._AbsoluteAngle = Class.NIL
 
 	self._Transform = Class.NIL
     self._InverseTransform = Class.NIL
+	self._LovrTransform = Class.NIL
 
 	self._Depth = 0
 	self._Visible = true
@@ -75,8 +81,55 @@ function InterfaceObject:SetPosition(position)
 	end
 end
 
+--[[DependsOn: Position]]--
 function InterfaceObject:GetAbsolutePosition()
-	return self._Position.Offset
+    if self._AbsolutePosition == Class.NIL then
+        self._AbsolutePosition = self._Position.Offset
+    end
+
+    return self._AbsolutePosition
+end
+
+function InterfaceObject:SetAbsolutePosition(position)
+	if position ~= self._AbsolutePosition then
+		self._AbsolutePosition = position
+		
+		return true, position
+	end
+end
+
+--[[DependsOn: Size]]--
+function InterfaceObject:GetAbsoluteSize()
+    if self._AbsoluteSize == Class.NIL then
+        self._AbsoluteSize = self._Size.Offset
+    end
+
+    return self._AbsoluteSize
+end
+
+function InterfaceObject:SetAbsoluteSize(size)
+	if size ~= self._AbsoluteSize then
+		self._AbsoluteSize = size
+		
+		return true, size
+	end
+end
+
+--[[DependsOn: Angle]]--
+function InterfaceObject:GetAbsoluteAngle()
+    if self._AbsoluteAngle == Class.NIL then
+        self._AbsoluteAngle = self._Angle
+    end
+
+    return self._AbsoluteAngle
+end
+
+function InterfaceObject:SetAbsoluteAngle(angle)
+	if angle ~= self._AbsoluteAngle then
+		self._AbsoluteAngle = angle
+		
+		return true, angle
+	end
 end
 
 function InterfaceObject:GetSize()
@@ -91,10 +144,6 @@ function InterfaceObject:SetSize(size)
 	end
 end
 
-function InterfaceObject:GetAbsoluteSize()
-	return self._Size.Offset
-end
-
 function InterfaceObject:GetAngle()
 	return self._Angle
 end
@@ -107,11 +156,7 @@ function InterfaceObject:SetAngle(angle)
 	end
 end
 
-function InterfaceObject:GetAbsoluteAngle()
-    return self._AbsoluteAngle
-end
-
---[[DependsOn: Position, Angle]]--
+--[[DependsOn: AbsolutePosition, AbsoluteAngle]]--
 function InterfaceObject:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
@@ -150,6 +195,23 @@ function InterfaceObject:SetInverseTransform(inverse)
     end
 end
 
+--[[DependsOn: Transform]]--
+function InterfaceObject:GetLovrTransform()
+	if self._LovrTransform == Class.NIL then
+		self._LovrTransform = Mat4(self.Transform:Unpack())
+	end
+
+	return self._LovrTransform
+end
+
+function InterfaceObject:SetLovrTransform(transform)
+	if transform ~= self._LovrTransform then
+		self._LovrTransform = transform
+
+		return true, transform
+	end
+end
+
 function InterfaceObject:GetDepth()
 	return self._Depth
 end
@@ -177,10 +239,14 @@ end
 function InterfaceObject:Destroy()
 	if not self._Destroyed then
 		self._Position = nil
+		self._AbsolutePosition = nil
+
 		self._Size = nil
+		self._AbsoluteSize = nil
 
 		self._Transform = nil
 		self._InverseTransform = nil
+		self._LovrTransform = nil
 
 		Hierarchy.Destroy(self)
 	end

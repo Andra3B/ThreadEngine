@@ -3,13 +3,14 @@ local Body = {}
 function Body.Create()
     local self = Class.CreateInstance(WorldNode.Create(), Body)
 
-	self._Mesh = nil
+	self._Mesh = Thread.Meshes.Cube
 
     return self
 end
 
 function Body:Draw(pass)
-	
+	--pass:box(self.LovrTransform, "fill")
+	pass:draw(self._Mesh, self.LovrTransform, 1)
 end
 
 function Body:GetMesh()

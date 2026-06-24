@@ -14,7 +14,7 @@ local function NewIndexMetamethod(self, name, value)
 	local setter = self.Class["Set"..name]
 
 	if setter then		
-		if setter(self, value) then
+		if setter(self, value) or value == Class.NIL then
 			local selfDependents = self.Class.DEPENDENCIES.Self[name]
 			
 			if selfDependents then
@@ -64,15 +64,7 @@ function Class.CreateClass(class, typeName, base, classPath, indexMetamethod, ne
 	class.INSTANCE_METATABLE.__index = indexMetamethod or base.INSTANCE_METATABLE.__index
 	class.INSTANCE_METATABLE.__newindex = newIndexMetamethod or base.INSTANCE_METATABLE.__newindex
 
-	class.DEPENDENCIES = {
-		Parent = setmetatable({}, base.DEPENDENCIES.Parent),
-		Self = setmetatable({}, base.DEPENDENCIES.Self),
-		Children = setmetatable({}, base.DEPENDENCIES.Children)
-	}
-
-	class.DEPENDENCIES.Parent.__index = class.DEPENDENCIES.Parent
-	class.DEPENDENCIES.Self.__index = class.DEPENDENCIES.Self
-	class.DEPENDENCIES.Children.__index = class.DEPENDENCIES.Children
+	class.DEPENDENCIES = table.clone(base.DEPENDENCIES)
 	
 	if classPath then
 		local functionName = nil
@@ -81,7 +73,7 @@ function Class.CreateClass(class, typeName, base, classPath, indexMetamethod, ne
 
 		for line in string.gmatch(lovr.filesystem.read(classPath), "(.-)\n") do
 			local attribute, arguments = string.match(line, "%-%-%[%[%s*([%w_]+)%s*:?(.*)%s*%]%]%-%-")
-
+			
 			if attribute then
 				functionName = nil
 				
@@ -131,7 +123,18 @@ function Class.CreateClass(class, typeName, base, classPath, indexMetamethod, ne
 								end
 							end
 
-							table.insert(dependents, property)
+							local contains = false
+
+							for _, dependent in pairs(dependents) do
+								if dependent == property then
+									contains = true
+									break
+								end
+							end
+
+							if not contains then
+								table.insert(dependents, property)
+							end
 						end
 					end
 

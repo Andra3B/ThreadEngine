@@ -7,7 +7,7 @@ local function NewIndexMetamethod(self, name, value)
 		local oldValue = self["_"..name]
 		local set, setValue = setter(self, value)
 		
-		if set then
+		if set or value == Class.NIL then
 			local selfDependents = self.Class.DEPENDENCIES.Self[name]
 			
 			if selfDependents then

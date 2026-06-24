@@ -3,10 +3,6 @@ local Frame = {}
 function Frame.Create()
     local self = Class.CreateInstance(InterfaceObject.Create(), Frame)
 
-    self._AbsolutePosition = Class.NIL
-    self._AbsoluteSize = Class.NIL
-    self._AbsoluteAngle = Class.NIL
-
     self._Origin = ScaleOffset2.Zero
     self._AbsoluteOrigin = Class.NIL
 
@@ -31,11 +27,9 @@ function Frame:Draw(pass)
     pass:send("BorderSize", self._BorderSize)
     pass:send("BorderColour", {self._BorderColour:Unpack()})
 
-	pass:transform(self.Transform.Components)
-
 	pass:setColor(self._BackgroundColour:Unpack())
 
-    pass:draw(Thread.Meshes.Square)
+    pass:draw(Thread.Meshes.Square, self.LovrTransform, 1)
 end
 
 --[[DependsOn: Position, Parent, ParentAbsoluteSize, ParentAbsolutePosition, ParentAbsoluteAngle, AbsoluteOrigin, Angle]]--
@@ -54,14 +48,6 @@ function Frame:GetAbsolutePosition()
     return self._AbsolutePosition
 end
 
-function Frame:SetAbsolutePosition(position)
-	if position ~= self._AbsolutePosition then
-		self._AbsolutePosition = position
-		
-		return true, position
-	end
-end
-
 --[[DependsOn: Size, Parent, ParentAbsoluteSize]]--
 function Frame:GetAbsoluteSize()
     if self._AbsoluteSize == Class.NIL then
@@ -75,14 +61,6 @@ function Frame:GetAbsoluteSize()
     return self._AbsoluteSize
 end
 
-function Frame:SetAbsoluteSize(size)
-	if size ~= self._Size then
-		self._Size = size
-
-		return true, size
-	end
-end
-
 --[[DependsOn: Angle, Parent, ParentAbsoluteAngle]]--
 function Frame:GetAbsoluteAngle()
     if self._AbsoluteAngle == Class.NIL then
@@ -94,14 +72,6 @@ function Frame:GetAbsoluteAngle()
     end
 
     return self._AbsoluteAngle
-end
-
-function Frame:SetAbsoluteAngle(angle)
-	if angle ~= self._AbsoluteAngle then
-		self._AbsoluteAngle = angle
-
-		return true, angle
-	end
 end
 
 function Frame:GetOrigin()
@@ -200,9 +170,6 @@ end
 
 function Frame:Destroy()
     if not self._Destroyed then
-        self._AbsolutePosition = nil
-        self._AbsoluteSize = nil
-
         self._Origin = nil
         self._AbsoluteOrigin = nil
 

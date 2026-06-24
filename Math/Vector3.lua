@@ -167,7 +167,7 @@ Vector3.Up = Vector3.Create(0, 1, 0)
 Vector3.Down = Vector3.Create(0, -1, 0)
 Vector3.Left = Vector3.Create(-1, 0, 0)
 Vector3.Right = Vector3.Create(1, 0, 0)
-Vector3.Forward = Vector3.Create(0, 0, 1)
-Vector3.Backward = Vector3.Create(0, 0, -1)
+Vector3.Forward = Vector3.Create(0, 0, -1)
+Vector3.Backward = Vector3.Create(0, 0, 1)
 
 return Vector3

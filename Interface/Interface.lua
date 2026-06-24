@@ -15,7 +15,9 @@ function Interface:Draw(pass)
 
 		for _, child in ipairs(self:GetDrawOrder()) do
 			if child.Visible then
+				pass:push("state")
 				child:Draw(pass)
+				pass:pop("state")
 			end
 		end
 	end
