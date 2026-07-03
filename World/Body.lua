@@ -9,8 +9,9 @@ function Body.Create()
 end
 
 function Body:Draw(pass)
-	--pass:box(self.LovrTransform, "fill")
-	pass:draw(self._Mesh, self.LovrTransform, 1)
+	if self._Mesh then
+		pass:draw(self._Mesh, self.LovrTransform, 1)
+	end
 end
 
 function Body:GetMesh()

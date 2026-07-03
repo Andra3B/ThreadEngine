@@ -12,6 +12,8 @@ function WorldObject.Create()
 	self._Orientation = Quaternion.One
     self._AbsoluteOrientation = Class.NIL
 
+	self._Forward = Class.NIL
+
 	self._Transform = Class.NIL
 	self._InverseTransform = Class.NIL
 	self._LovrTransform = Class.NIL
@@ -104,6 +106,23 @@ function WorldObject:SetAbsoluteOrientation(orientation)
 		self._AbsoluteOrientation = orientation
 		
 		return true, orientation
+	end
+end
+
+--[[DependsOn: AbsoluteOrientation]]--
+function WorldObject:GetForward()
+	if self._Forward == Class.NIL then
+		self._Forward = Vector3.Forward:Rotate(self.AbsoluteOrientation)
+	end
+
+	return self._Forward
+end
+
+function WorldObject:SetForward(forward)
+	if forward ~= self._Forward then
+		self._Forward = forward
+
+		return true, forward
 	end
 end
 

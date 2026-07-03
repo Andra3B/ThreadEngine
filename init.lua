@@ -99,6 +99,8 @@ WorldNode = require("World.WorldNode")
 Model = require("World.Model")
 Body = require("World.Body")
 Camera = require("World.Camera")
+Light = require("World.Lights.Light")
+PointLight = require("World.Lights.PointLight")
 
 InterfaceObject = require("Interface.InterfaceObject")
 Interface = require("Interface.Interface")
@@ -131,6 +133,8 @@ Thread.Events = nil
 Thread.World = nil
 Thread.Interface = nil
 
+Thread.LovrMatrixIdentity = nil
+
 Thread.Shaders = {}
 Thread.Meshes = {}
 
@@ -146,6 +150,8 @@ local function ThreadQuit(exitCode)
 
 	table.erase(Thread.Shaders, LovrResourceRelease)
 	table.erase(Thread.Meshes, LovrResourceRelease)
+
+	Thread.LovrMatrixIdentity = nil
 
 	Thread.Interface:Destroy()
 	Thread.Interface = nil
@@ -186,6 +192,9 @@ end
 
 function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
+
+	Thread.LovrMatrixIdentity = lovr.math.newMat4()
+
 	Thread.World = World.Create()
 	Thread.Interface = Interface.Create()
 
@@ -284,54 +293,40 @@ function lovr.run()
 	lovr.system.openWindow(engineOptions.Window or DEFAULT_ENGINE_OPTIONS.Window)
 	
 	lovr.graphics.setBackgroundColor(0, 0, 0, 1)
-
-	local windowPass = lovr.graphics.getWindowPass()
 	
-	windowPass:setDepthTest("none")
-	windowPass:setDepthWrite(false)
-
-	windowPass:setFaceCull("none")
-	
-	windowPass:setWinding("counterclockwise")
-
 	lovr.resize(lovr.system.getWindowDimensions())
-
+	
 	lovr.timer.step()
-
+	
 	return function()
 		lovr.system.pollEvents()
-
+		
 		for name, a, b, c, d in lovr.event.poll() do
 			if name == "restart" then
 				return "restart", Thread.Restart()
 			elseif name == "quit" then
 				a = a or 0
 				ThreadQuit(a)
-
+				
 				return a
 			elseif lovr.handlers[name] then
 				lovr.handlers[name](a, b, c, d)
 			end
 		end
-
+		
 		local deltaTime = lovr.timer.step()
-
+		
 		Timer.Update(deltaTime)
 		
 		Thread.Update(deltaTime)
-
+		
 		Thread.World:Update(deltaTime)
 		Thread.Interface:Update(deltaTime)
-
+		
 		local windowPass = lovr.graphics.getWindowPass()
 		
-		windowPass:push("state")
 		Thread.World:Draw(windowPass)
-		windowPass:pop("state")
-
-		windowPass:push("state")
 		Thread.Interface:Draw(windowPass)
-		windowPass:pop("state")
 
 		lovr.graphics.submit(windowPass)
 		lovr.graphics.present()

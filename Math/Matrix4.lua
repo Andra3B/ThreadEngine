@@ -100,9 +100,9 @@ function Matrix4.CreatePerspectiveProjection(aspectRatio, fov, near, far)
 
 	return Matrix4.Create({
 		inverseTanOfHalfFOV / aspectRatio, 0, 0, 0,
-		0, inverseTanOfHalfFOV, 0, 0,
-		0, 0, (far + near) / (near - far), -1,
-		0, 0, (2*far*near) / (near - far), 0
+		0, -inverseTanOfHalfFOV, 0, 0,
+		0, 0, far / (near - far), -1,
+		0, 0, (far*near) / (near - far), 0
 	})
 end
 

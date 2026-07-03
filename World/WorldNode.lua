@@ -9,11 +9,11 @@ function WorldNode.Create()
     return self
 end
 
---[[DependsOn: Position, Parent, ParentAbsolutePosition, Orientation]]--
+--[[DependsOn: Position, Parent, ParentAbsolutePosition]]--
 function WorldNode:GetAbsolutePosition()
     if self._AbsolutePosition == Class.NIL then
         if Class.IsA(self._Parent, "WorldObject") then
-            self._AbsolutePosition = self._Parent.AbsolutePosition + self._Position:Rotate(self._Orientation)
+            self._AbsolutePosition = self._Parent.AbsolutePosition + self._Position
         else
             self._AbsolutePosition = self._Position
         end

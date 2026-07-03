@@ -12,6 +12,12 @@ function Interface:Draw(pass)
 	if self._Visible then
 		pass:setShader(Thread.Shaders.Interface)
 		pass:setProjection("matrix", self._Projection:Unpack())
+		pass:setViewPose(1, Thread.LovrMatrixIdentity, true)
+
+		pass:setFaceCull("none")
+
+		pass:setDepthTest("none")
+		pass:setDepthWrite(false)
 
 		for _, child in ipairs(self:GetDrawOrder()) do
 			if child.Visible then
