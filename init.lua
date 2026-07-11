@@ -99,6 +99,7 @@ WorldNode = require("World.WorldNode")
 Model = require("World.Model")
 Body = require("World.Body")
 Camera = require("World.Camera")
+Skybox = require("World.Skybox")
 Light = require("World.Lights.Light")
 PointLight = require("World.Lights.PointLight")
 
@@ -133,6 +134,8 @@ Thread.Events = nil
 Thread.World = nil
 Thread.Interface = nil
 
+Thread.SkyboxUpdatePass = nil
+
 Thread.LovrMatrixIdentity = nil
 
 Thread.Shaders = {}
@@ -150,6 +153,9 @@ local function ThreadQuit(exitCode)
 
 	table.erase(Thread.Shaders, LovrResourceRelease)
 	table.erase(Thread.Meshes, LovrResourceRelease)
+
+	Thread.SkyboxUpdatePass:release()
+	Thread.SkyboxUpdatePass = nil
 
 	Thread.LovrMatrixIdentity = nil
 
@@ -192,6 +198,8 @@ end
 
 function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
+
+	Thread.SkyboxUpdatePass = lovr.graphics.newPass()
 
 	Thread.LovrMatrixIdentity = lovr.math.newMat4()
 

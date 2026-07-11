@@ -1,6 +1,7 @@
 require("init")
 
 function Thread.Load()
+	skybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
 	cube = Body.Create()	
 	light = PointLight.Create()
 
