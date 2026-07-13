@@ -2,28 +2,58 @@ local Skybox = {}
 
 local skyboxUpdateQueue = {}
 
-function Skybox.UpdateSkyboxes(pass)
-	while #skyboxUpdateQueue > 0 do
-		local skybox = table.remove(skyboxUpdateQueue, 1)
+function Skybox.Update(pass)
+	local skybox = nil
 
-		
+	repeat
+		skybox = table.remove(skyboxUpdateQueue, 1)
+	until not skybox or not skybox.Destroyed
+
+	if skybox then
+		pass:setCanvas(skybox._CubeTexture)
+
+		pass:setShader(Thread.Shaders.SkyboxUpdate)
+		pass:send("Skybox", skybox._Texture)
+
+		pass:setProjection(1, Thread.SkyboxUpdateMatrices[1])
+		pass:setProjection(2, Thread.SkyboxUpdateMatrices[1])
+		pass:setProjection(3, Thread.SkyboxUpdateMatrices[1])
+		pass:setProjection(4, Thread.SkyboxUpdateMatrices[1])
+		pass:setProjection(5, Thread.SkyboxUpdateMatrices[1])
+		pass:setProjection(6, Thread.SkyboxUpdateMatrices[1])
+
+		pass:setViewPose(1, Thread.SkyboxUpdateMatrices[2])
+		pass:setViewPose(2, Thread.SkyboxUpdateMatrices[3])
+		pass:setViewPose(3, Thread.SkyboxUpdateMatrices[4])
+		pass:setViewPose(4, Thread.SkyboxUpdateMatrices[5])
+		pass:setViewPose(5, Thread.SkyboxUpdateMatrices[6])
+		pass:setViewPose(6, Thread.SkyboxUpdateMatrices[7])
+
+		pass:draw(Thread.Meshes.Cube)
 	end
 end
 
 function Skybox.Create(path, skyboxSize)
 	skyboxSize = skyboxSize or 1024
 	
-	local skyboxImage = lovr.data.newImage(path)
+	local texture = lovr.graphics.newTexture(path, {
+		type = "2d",
+		format = "rgba16f",
+		linear = true,
+		mipmaps = false,
+		usage = {"sample"}
+	})
 
-	if skyboxImage then
+	if texture then
 		local self = Class.CreateInstance(Object.Create(), Skybox)
 
-		self._SkyboxImage = skyboxImage
-		self._SkyboxTexture = lovr.graphics.newTexture(skyboxSize, skyboxSize, {
+		self._Texture = texture
+		self._CubeTexture = lovr.graphics.newTexture(skyboxSize, skyboxSize, {
 			type = "cube",
+			format = "rgba16f",
 			linear = true,
 			mipmaps = false,
-			usage = {sample, render}
+			usage = {"sample", "render"}
 		})
 
 		self._Updated = true
@@ -41,17 +71,21 @@ function Skybox:Refresh()
 	end
 end
 
-function Skybox:GetSkyboxTexture()
-	return self._SkyboxTexture
+function Skybox:GetTexture()
+	return self._Texture
+end
+
+function Skybox:GetCubeTexture()
+	return self._CubeTexture
 end
 
 function Skybox:Destroy()
 	if not self._Destroyed then
-		self._SkyboxImage:release()
-		self._SkyboxImage = nil
+		self._Texture:release()
+		self._Texture = nil
 
-		self._SkyboxTexture:release()
-		self._SkyboxTexture = nil		
+		self._CubeTexture:release()
+		self._CubeTexture = nil		
 
 		Object.Destroy(self)
 	end

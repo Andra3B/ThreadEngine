@@ -135,6 +135,9 @@ Thread.World = nil
 Thread.Interface = nil
 
 Thread.SkyboxUpdatePass = nil
+Thread.SkyboxUpdateMatrices = table.new(0, 7)
+
+Thread.DefaultSkybox = nil
 
 Thread.LovrMatrixIdentity = nil
 
@@ -156,6 +159,11 @@ local function ThreadQuit(exitCode)
 
 	Thread.SkyboxUpdatePass:release()
 	Thread.SkyboxUpdatePass = nil
+
+	table.erase(Thread.SkyboxUpdateMatrices)
+
+	Thread.DefaultSkybox:Destroy()
+	Thread.DefaultSkybox = nil
 
 	Thread.LovrMatrixIdentity = nil
 
@@ -201,6 +209,16 @@ function lovr.run()
 
 	Thread.SkyboxUpdatePass = lovr.graphics.newPass()
 
+	Thread.SkyboxUpdateMatrices[1] = lovr.math.newMat4(Matrix4.CreatePerspectiveProjection(1, math.rad(90), 0.1, 1):Unpack())
+	Thread.SkyboxUpdateMatrices[2] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(-90), 0)):Unpack()) -- +X
+	Thread.SkyboxUpdateMatrices[3] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(90), 0)):Unpack())	-- -X
+	Thread.SkyboxUpdateMatrices[4] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(math.rad(90), 0, 0)):Unpack())	-- +Y
+	Thread.SkyboxUpdateMatrices[5] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(math.rad(-90), 0, 0)):Unpack())	-- -Y
+	Thread.SkyboxUpdateMatrices[6] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(0), 0)):Unpack())	-- +Z
+	Thread.SkyboxUpdateMatrices[7] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(180), 0)):Unpack())	-- -Z
+
+	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
+
 	Thread.LovrMatrixIdentity = lovr.math.newMat4()
 
 	Thread.World = World.Create()
@@ -218,6 +236,18 @@ function lovr.run()
 		{label = "World", flags = {
 			tonemap = true
 		}}
+	)
+
+	Thread.Shaders.Skybox = lovr.graphics.newShader(
+		"Assets/Shaders/Skybox.vert",
+		"Assets/Shaders/Skybox.frag",
+		{label = "Skybox"}
+	)
+
+	Thread.Shaders.SkyboxUpdate = lovr.graphics.newShader(
+		"Assets/Shaders/World.vert",
+		"Assets/Shaders/SkyboxUpdate.frag",
+		{label = "SkyboxUpdate"}
 	)
 
 	Thread.Meshes.Square = lovr.graphics.newMesh({
@@ -330,13 +360,15 @@ function lovr.run()
 		
 		Thread.World:Update(deltaTime)
 		Thread.Interface:Update(deltaTime)
-		
+
+		Skybox.Update(Thread.SkyboxUpdatePass)
+
 		local windowPass = lovr.graphics.getWindowPass()
-		
+
 		Thread.World:Draw(windowPass)
 		Thread.Interface:Draw(windowPass)
 
-		lovr.graphics.submit(windowPass)
+		lovr.graphics.submit(Thread.SkyboxUpdatePass, windowPass)
 		lovr.graphics.present()
 	end
 end

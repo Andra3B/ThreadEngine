@@ -5,6 +5,8 @@ function World.Create()
 
 	self._Camera = Camera.Create()
 
+	self._Skybox = Thread.DefaultSkybox
+
 	self._LightStateBuffer = lovr.graphics.newBuffer({
 		{name = "Position", type = "vec4", length = 32},
 		{name = "Direction", type = "vec4", length = 32},
@@ -30,16 +32,24 @@ end
 
 function World:Draw(pass)
 	if self._Camera then
-		pass:setShader(Thread.Shaders.World)
 		pass:setProjection("matrix", self._Camera.Projection:Unpack())
 		pass:setViewPose(1, self._Camera.LovrInverseTransform, true)
 		
+		pass:setColor(1, 1, 1, 1)
+
+		pass:setFaceCull("front")
+
+		pass:setShader(Thread.Shaders.Skybox)
+
+		pass:send("Skybox", self._Skybox.CubeTexture)
+		pass:draw(Thread.Meshes.Cube)
+		
 		pass:setFaceCull("back")
+
+		pass:setShader(Thread.Shaders.World)
 
 		pass:setDepthTest("gequal")
 		pass:setDepthWrite(true)
-		
-		pass:setColor(1, 1, 1, 1)
 
 		for descendant in self:IterateDescendants() do
 			if Class.IsA(descendant, "Light") and descendant.WorldStateRefresh then
@@ -76,6 +86,18 @@ function World:SetCamera(camera)
 		camera.Projection = Class.NIL
 
 		return true, camera
+	end
+end
+
+function World:GetSkybox()
+	return self._Skybox
+end
+
+function World:SetSkybox(skybox)
+	if skybox ~= self._Skybox then
+		self._Skybox = skybox
+
+		return true, skybox
 	end
 end
 
@@ -149,6 +171,8 @@ function World:Destroy()
 	if not self._Destroyed then
 		self._Camera = nil
 		
+		self._Skybox = nil
+
 		self._LightStateBuffer:release()
 		self._LightStateBuffer = nil
 
