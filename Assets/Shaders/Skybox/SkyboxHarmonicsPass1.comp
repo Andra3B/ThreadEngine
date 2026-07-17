@@ -1,0 +1,93 @@
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+uniform textureCube Skybox;
+
+writeonly buffer OutputBuffer {
+	vec4 BlockHarmonics[];
+};
+
+uniform float SkyboxSize; // Size of mip level
+uniform float SkyboxMipLevel;
+
+shared vec3 SharedBlockHarmonics[256][9];
+
+vec3 FaceUVToDirection(vec2 uv, uint face) {
+    vec2 d = uv * 2.0 - 1.0; 
+    
+    vec3 direction;
+
+    if (face == 0) direction = vec3(1.0, -d.y, -d.x);	// +X
+    if (face == 1) direction = vec3(-1.0, -d.y, d.x);	// -X
+    if (face == 2) direction = vec3(d.x, 1.0, d.y);		// +Y
+    if (face == 3) direction = vec3(d.x, -1.0, -d.y);	// -Y
+    if (face == 4) direction = vec3(d.x, -d.y, 1.0);	// +Z
+    if (face == 5) direction = vec3(d.x, -d.y, -1.0);	// -Z
+
+    return normalize(dir);
+}
+
+void ComputeSphericalHarmonicBasis(vec3 dir, float* Y) {
+    // L=0
+    Y[0] = 0.282095; // 0.5 * sqrt(1 / PI)
+    
+    // L=1
+    Y[1] = 0.488603 * dir.y; // 0.5 * sqrt(3 / PI) * y
+    Y[2] = 0.488603 * dir.z; // 0.5 * sqrt(3 / PI) * z
+    Y[3] = 0.488603 * dir.x; // 0.5 * sqrt(3 / PI) * x
+    
+    // L=2
+    Y[4] = 1.092548 * dir.x * dir.y; // 0.5 * sqrt(15 / PI) * x * y
+    Y[5] = 1.092548 * dir.y * dir.z; // 0.5 * sqrt(15 / PI) * y * z
+    Y[6] = 0.315392 * (3.0 * dir.z * dir.z - 1.0); // 0.25 * sqrt(5 / PI) * (3z^2 - 1)
+    Y[7] = 1.092548 * dir.x * dir.z; // 0.5 * sqrt(15 / PI) * x * z
+    Y[8] = 0.546274 * (dir.x * dir.x - dir.y * dir.y); // 0.25 * sqrt(15 / PI) * (x^2 - y^2)
+}
+
+void lovrmain() {
+	uint face = gl_GlobalInvocationID.z;
+
+	if (face >= 6 || gl_GlobalInvocationID.x >= SkyboxSize || gl_GlobalInvocationID.y >= SkyboxSize) {
+		for (int i = 0; i < 9; ++i) {
+			SharedBlockHarmonics[gl_LocalInvocationIndex][i] = vec3(0.0);
+		}
+
+		return;
+	}
+
+	vec2 uv = (gl_GlobalInvocationID.xy + 0.5) / SkyboxSize;
+	vec3 direction = FaceUVToDirection(uv, face);
+
+	vec2 signedUV = uv * 2.0 - 1.0;
+	float texelSquaredDistance = signedUV.x * signedUV.x + signedUV.y + signedUV.y + 1.0;
+	float solidAngle = 4.0 / (texelSquaredDistance * sqrt(texelSquaredDistance) * SkyboxSize * SkyboxSize);
+
+	vec3 SkyboxColour = textureLod(Skybox, direction, SkyboxMipLevel).rgb;
+
+	float Y[9];
+	ComputeSphericalHarmonicBasis(direction, &Y);
+
+	for (int i = 0; i < 9; ++i) {
+		SharedBlockHarmonics[gl_LocalInvocationIndex][i] = SkyboxColour * Y[i] * solidAngle;
+	}
+
+	barrier();
+
+	for (uint stride = gl_WorkGroupSize.x * gl_WorkGroupSize.y * 0.5; stride > 0; stride >>= 1) {
+		if (gl_LocalInvocationIndex < stride) {
+			for (int i = 0; i < 9; ++i) {
+				SharedBlockHarmonics[gl_LocalInvocationIndex][i] += SharedBlockHarmonics[gl_LocalInvocationIndex + stride][i];
+			}
+		}
+
+		barrier();
+	}
+
+	if (gl_LocalInvocationIndex == 0) {
+		uint blockID = gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.y * gl_NumWorkGroups.z;
+		uint blockOffset = blockID * 9;
+
+		for (int i = 0; i < 9; ++i) {
+			BlockHarmonics[blockOffset + i] = vec4(SharedBlockHarmonics[0][i], 0.0);
+		}
+	}
+}

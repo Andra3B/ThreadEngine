@@ -33,9 +33,7 @@ function Skybox.Update(pass)
 	end
 end
 
-function Skybox.Create(path, skyboxSize)
-	skyboxSize = skyboxSize or 1024
-	
+function Skybox.Create(path)
 	local texture = lovr.graphics.newTexture(path, {
 		type = "2d",
 		format = "rgba16f",
@@ -48,7 +46,7 @@ function Skybox.Create(path, skyboxSize)
 		local self = Class.CreateInstance(Object.Create(), Skybox)
 
 		self._Texture = texture
-		self._CubeTexture = lovr.graphics.newTexture(skyboxSize, skyboxSize, {
+		self._CubeTexture = lovr.graphics.newTexture(1024, 1024, {
 			type = "cube",
 			format = "rgba16f",
 			linear = true,
