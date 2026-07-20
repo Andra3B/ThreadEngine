@@ -38,10 +38,10 @@ function World:Draw(pass)
 		pass:setColor(1, 1, 1, 1)
 
 		pass:setFaceCull("front")
-
+		
 		pass:setShader(Thread.Shaders.Skybox)
-
 		pass:send("Skybox", self._Skybox.CubeTexture)
+
 		pass:draw(Thread.Meshes.Cube)
 		
 		pass:setFaceCull("back")
@@ -64,6 +64,9 @@ function World:Draw(pass)
 
 		pass:send("Lights", self._LightStateBuffer)
 		pass:send("LightCount", #self._LightState.Lights)
+
+		pass:send("Skybox", self._Skybox.CubeTexture)
+		pass:send("SkyboxHarmonics", self._Skybox.HarmonicsBuffer)
 
 		for descendant in self:IterateDescendants() do
 			if Class.IsA(descendant, "Body") then

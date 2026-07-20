@@ -134,8 +134,10 @@ Thread.Events = nil
 Thread.World = nil
 Thread.Interface = nil
 
-Thread.SkyboxUpdatePass = nil
+Thread.SkyboxUpdateRenderPass = nil
+Thread.SkyboxUpdateComputePass = nil
 Thread.SkyboxUpdateMatrices = table.new(0, 7)
+Thread.SkyboxBlockHarmonicsBuffer = nil
 
 Thread.DefaultSkybox = nil
 
@@ -157,13 +159,19 @@ local function ThreadQuit(exitCode)
 	table.erase(Thread.Shaders, LovrResourceRelease)
 	table.erase(Thread.Meshes, LovrResourceRelease)
 
-	Thread.SkyboxUpdatePass:release()
-	Thread.SkyboxUpdatePass = nil
+	Thread.SkyboxUpdateRenderPass:release()
+	Thread.SkyboxUpdateRenderPass = nil
+
+	Thread.SkyboxUpdateComputePass:release()
+	Thread.SkyboxUpdateComputePass = nil
 
 	table.erase(Thread.SkyboxUpdateMatrices)
 
 	Thread.DefaultSkybox:Destroy()
 	Thread.DefaultSkybox = nil
+
+	Thread.SkyboxBlockHarmonicsBuffer:release()
+	Thread.SkyboxBlockHarmonicsBuffer = nil
 
 	Thread.LovrMatrixIdentity = nil
 
@@ -207,7 +215,8 @@ end
 function lovr.run()
 	Thread.Events = EventDirector.Create(Thread)
 
-	Thread.SkyboxUpdatePass = lovr.graphics.newPass()
+	Thread.SkyboxUpdateRenderPass = lovr.graphics.newPass()
+	Thread.SkyboxUpdateComputePass = lovr.graphics.newPass()
 
 	Thread.SkyboxUpdateMatrices[1] = lovr.math.newMat4(Matrix4.CreatePerspectiveProjection(1, math.rad(90), 0.1, 1):Unpack())
 	Thread.SkyboxUpdateMatrices[2] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(-90), 0)):Unpack()) -- +X
@@ -217,7 +226,9 @@ function lovr.run()
 	Thread.SkyboxUpdateMatrices[6] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(0), 0)):Unpack())	-- +Z
 	Thread.SkyboxUpdateMatrices[7] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(180), 0)):Unpack())	-- -Z
 
-	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
+	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/Studio.hdr")
+
+	Thread.SkyboxBlockHarmonicsBuffer = lovr.graphics.newBuffer({"vec3", layout = "std140"}, 55296)
 
 	Thread.LovrMatrixIdentity = lovr.math.newMat4()
 
@@ -239,15 +250,27 @@ function lovr.run()
 	)
 
 	Thread.Shaders.Skybox = lovr.graphics.newShader(
-		"Assets/Shaders/Skybox.vert",
-		"Assets/Shaders/Skybox.frag",
-		{label = "Skybox"}
+		"Assets/Shaders/Skybox/Skybox.vert",
+		"Assets/Shaders/Skybox/Skybox.frag",
+		{label = "Skybox", flags = {
+			tonemap = true
+		}}
 	)
 
 	Thread.Shaders.SkyboxUpdate = lovr.graphics.newShader(
 		"Assets/Shaders/World.vert",
-		"Assets/Shaders/SkyboxUpdate.frag",
+		"Assets/Shaders/Skybox/SkyboxUpdate.frag",
 		{label = "SkyboxUpdate"}
+	)
+
+	Thread.Shaders.SkyboxHarmonicsPass1 = lovr.graphics.newShader(
+		"Assets/Shaders/Skybox/SkyboxHarmonicsPass1.comp",
+		{label = "SkyboxHarmonicsPass1"}
+	)
+
+	Thread.Shaders.SkyboxHarmonicsPass2 = lovr.graphics.newShader(
+		"Assets/Shaders/Skybox/SkyboxHarmonicsPass2.comp",
+		{label = "SkyboxHarmonicsPass2"}
 	)
 
 	Thread.Meshes.Square = lovr.graphics.newMesh({
@@ -361,14 +384,22 @@ function lovr.run()
 		Thread.World:Update(deltaTime)
 		Thread.Interface:Update(deltaTime)
 
-		Skybox.Update(Thread.SkyboxUpdatePass)
+		Skybox.Update(Thread.SkyboxUpdateRenderPass, Thread.SkyboxUpdateComputePass)
 
 		local windowPass = lovr.graphics.getWindowPass()
 
 		Thread.World:Draw(windowPass)
 		Thread.Interface:Draw(windowPass)
 
-		lovr.graphics.submit(Thread.SkyboxUpdatePass, windowPass)
+		lovr.graphics.submit(
+			Thread.SkyboxUpdateRenderPass,
+			Thread.SkyboxUpdateComputePass,
+			windowPass
+		)
+
+		Thread.SkyboxUpdateRenderPass:reset()
+		Thread.SkyboxUpdateComputePass:reset()
+
 		lovr.graphics.present()
 	end
 end

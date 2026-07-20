@@ -9,6 +9,12 @@
 
 layout(constant_id = 0) const int flag_MaximumLights = 32;
 
+uniform textureCube Skybox;
+
+readonly buffer SkyboxHarmonics {
+	vec3 Harmonics[9];
+};
+
 uniform int LightCount;
 
 uniform Lights {
@@ -16,7 +22,7 @@ uniform Lights {
 	vec4 Direction[flag_MaximumLights];	// Direction, Radius
 	vec4 Intensity[flag_MaximumLights];	// Intensity, 0
 	vec4 FallOff[flag_MaximumLights];	// Type, FallOffType, FallOffCoefficient, Range
-} Light;
+};
 
 float GetFallOffFactor(int fallOffType, float distance, float range, float coefficient) {
 	if (fallOffType == FALL_OFF_LINEAR) {
@@ -35,11 +41,13 @@ vec4 lovrmain() {
 
 	Surface surface = getDefaultSurface();
 
+	colour += getIndirectLighting(surface, Skybox, Harmonics);
+
 	for (int lightIndex = 0; lightIndex < LightCount; lightIndex++) {
-		if (int(Light.Position[lightIndex].w) == 1) {
-			vec3 lightPosition = Light.Position[lightIndex].xyz;
-			vec3 lightIntensity = Light.Intensity[lightIndex].rgb;
-			vec4 lightFallOff = Light.FallOff[lightIndex];
+		if (int(Position[lightIndex].w) == 1) {
+			vec3 lightPosition = Position[lightIndex].xyz;
+			vec3 lightIntensity = Intensity[lightIndex].rgb;
+			vec4 lightFallOff = FallOff[lightIndex];
 
 			vec3 L = lightPosition - PositionWorld;
 			float lightDistance = length(L);

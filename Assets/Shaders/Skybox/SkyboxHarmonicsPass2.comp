@@ -1,49 +1,37 @@
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-buffer InputBuffer {
-	vec4 BlockHarmonics[];
-}
+layout(std140) readonly buffer InputBuffer {
+	vec3 BlockHarmonics[];
+};
 
-buffer writeonly buffer OutputBuffer {
-	vec4 Harmonics[9];
-}
+layout(std140) buffer OutputBuffer {
+	vec3 Harmonics[9];
+};
 
 uniform uint BlockCount;
 
-shared vec3 SharedHarmonics[64][9];
+shared vec3 LocalHarmonics[64][9];
 
 void lovrmain() {
-	uint workerID = gl_LocalInvocationID.x;
-
-	vec3 localHarmonics[9] = {vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0), vec3(0.0)};
-
-	for (uint i = workerID; i < BlockCount; i += gl_WorkGroupSize.x) {
-		uint baseOffset = i * 9;
-
-		for (int j = 0; j < 9; ++j) {
-			localHarmonics[j] += BlockHarmonics[baseOffset + j].rgb;
-		}
-	}
-
-	for (int i = 0; i < 9; ++i) {
-		SharedHarmonics[workerID][i] = localHarmonics[i];
+	for (uint i = 0; i < 9; ++i) {
+		LocalHarmonics[gl_LocalInvocationIndex][i] = vec3(0.0);
 	}
 
 	barrier();
 
-	for (uint stride = gl_WorkGroupSize.x * 0.5; stride > 0; stride >>= 1) {
-		if (workerID < stride) {
-			for (int i = 0; i < 9; ++i) {
-				SharedHarmonics[workerID][i] += SharedHarmonics[workerID + stride][i];
-			}
-		}
+	for (uint i = gl_LocalInvocationIndex; i < BlockCount; i += gl_WorkGroupSize.x) {
+		uint offset = i * 9;
 
-		barrier();
+		for (uint j = 0; j < 9; ++j) {
+			LocalHarmonics[gl_LocalInvocationIndex][j] += BlockHarmonics[offset + j];
+		}
 	}
 
-	if (workerID == 0) {
-		for (int i = 0; i < 9; ++i) {
-			Harmonics[i] = vec4(SharedHarmonics[0][i], 0.0);
+	barrier();
+
+	if (gl_LocalInvocationIndex < 9) {
+		for (uint i = 0; i < gl_WorkGroupSize.x; ++i) {
+			Harmonics[gl_LocalInvocationIndex] += LocalHarmonics[i][gl_LocalInvocationIndex];
 		}
 	}
 }

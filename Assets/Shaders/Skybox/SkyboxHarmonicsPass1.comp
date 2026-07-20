@@ -1,93 +1,102 @@
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-uniform textureCube Skybox;
-
-writeonly buffer OutputBuffer {
-	vec4 BlockHarmonics[];
+layout(std140) writeonly buffer OutputBuffer {
+	vec3 BlockHarmonics[];
 };
 
-uniform float SkyboxSize; // Size of mip level
-uniform float SkyboxMipLevel;
+uniform samplerCube Skybox;
 
-shared vec3 SharedBlockHarmonics[256][9];
+shared vec3 LocalHarmonics[256][9];
 
-vec3 FaceUVToDirection(vec2 uv, uint face) {
-    vec2 d = uv * 2.0 - 1.0; 
-    
-    vec3 direction;
-
-    if (face == 0) direction = vec3(1.0, -d.y, -d.x);	// +X
-    if (face == 1) direction = vec3(-1.0, -d.y, d.x);	// -X
-    if (face == 2) direction = vec3(d.x, 1.0, d.y);		// +Y
-    if (face == 3) direction = vec3(d.x, -1.0, -d.y);	// -Y
-    if (face == 4) direction = vec3(d.x, -d.y, 1.0);	// +Z
-    if (face == 5) direction = vec3(d.x, -d.y, -1.0);	// -Z
-
-    return normalize(dir);
+float AreaElement(float x, float y) {
+    return atan(x * y, sqrt(x * x + y * y + 1.0));
 }
 
-void ComputeSphericalHarmonicBasis(vec3 dir, float* Y) {
+float TexelSolidAngle(vec2 uv, vec2 inverseSize) {
+    vec2 v0 = uv - inverseSize * 0.5;
+    vec2 v1 = uv + inverseSize * 0.5;
+
+    return AreaElement(v0.x, v0.y) - AreaElement(v0.x, v1.y) - AreaElement(v1.x, v0.y) + AreaElement(v1.x, v1.y);
+}
+
+vec3 FaceUVToDirection(vec2 uv, uint face) {
+    vec3 direction;
+
+	switch(face) {
+		case 0: direction = vec3(1.0, -uv.y, uv.x); break;		// +X
+		case 1: direction = vec3(-1.0, -uv.y, -uv.x); break;	// -X
+		case 2: direction = vec3(uv.x, 1.0, -uv.y); break;		// +Y
+		case 3: direction = vec3(uv.x, -1.0, uv.y); break;		// -Y
+		case 4: direction = vec3(-uv.x, -uv.y, 1.0); break;		// +Z
+		default: direction = vec3(uv.x, -uv.y, -1.0); break;	// -Z
+	}
+
+    return normalize(direction);
+}
+
+void ComputeSphericalHarmonicBasis(vec3 direction, inout float Y[9]) {
     // L=0
-    Y[0] = 0.282095; // 0.5 * sqrt(1 / PI)
+    Y[0] = 0.079578; // (0.5 * sqrt(1 / PI))^2
     
     // L=1
-    Y[1] = 0.488603 * dir.y; // 0.5 * sqrt(3 / PI) * y
-    Y[2] = 0.488603 * dir.z; // 0.5 * sqrt(3 / PI) * z
-    Y[3] = 0.488603 * dir.x; // 0.5 * sqrt(3 / PI) * x
+    Y[1] = 0.238733 * direction.y; // (0.5 * sqrt(3 / PI))^2 * y
+    Y[2] = 0.238733 * direction.z; // (0.5 * sqrt(3 / PI))^2 * z
+    Y[3] = 0.238733 * direction.x; // (0.5 * sqrt(3 / PI))^2 * x
     
     // L=2
-    Y[4] = 1.092548 * dir.x * dir.y; // 0.5 * sqrt(15 / PI) * x * y
-    Y[5] = 1.092548 * dir.y * dir.z; // 0.5 * sqrt(15 / PI) * y * z
-    Y[6] = 0.315392 * (3.0 * dir.z * dir.z - 1.0); // 0.25 * sqrt(5 / PI) * (3z^2 - 1)
-    Y[7] = 1.092548 * dir.x * dir.z; // 0.5 * sqrt(15 / PI) * x * z
-    Y[8] = 0.546274 * (dir.x * dir.x - dir.y * dir.y); // 0.25 * sqrt(15 / PI) * (x^2 - y^2)
+    Y[4] = 1.193661 * direction.x * direction.y; // (0.5 * sqrt(15 / PI))^2 * x * y
+    Y[5] = 1.193661 * direction.y * direction.z; // (0.5 * sqrt(15 / PI))^2 * y * z
+    Y[6] = 0.099472 * (3.0 * direction.z * direction.z - 1.0); // (0.25 * sqrt(5 / PI))^2 * (3z^2 - 1)
+    Y[7] = 1.193661 * direction.x * direction.z; // (0.5 * sqrt(15 / PI))^2 * x * z
+    Y[8] = 0.298415 * (direction.x * direction.x - direction.y * direction.y); // (0.25 * sqrt(15 / PI))^2 * (x^2 - y^2)
 }
 
 void lovrmain() {
-	uint face = gl_GlobalInvocationID.z;
+	ivec2 skyboxSize = textureSize(Skybox, 0);
+	uvec2 texel = gl_GlobalInvocationID.xy;
 
-	if (face >= 6 || gl_GlobalInvocationID.x >= SkyboxSize || gl_GlobalInvocationID.y >= SkyboxSize) {
-		for (int i = 0; i < 9; ++i) {
-			SharedBlockHarmonics[gl_LocalInvocationIndex][i] = vec3(0.0);
-		}
-
-		return;
+	for (uint i = 0; i < 9; ++i) {
+		LocalHarmonics[gl_LocalInvocationIndex][i] = vec3(0.0);
 	}
 
-	vec2 uv = (gl_GlobalInvocationID.xy + 0.5) / SkyboxSize;
-	vec3 direction = FaceUVToDirection(uv, face);
+	if (texel.x < skyboxSize.x && texel.y < skyboxSize.y) {
+		vec2 signedUV = ((texel + 0.5) / skyboxSize) * 2.0 - 1.0;
+		vec3 direction = FaceUVToDirection(signedUV, gl_GlobalInvocationID.z);
 
-	vec2 signedUV = uv * 2.0 - 1.0;
-	float texelSquaredDistance = signedUV.x * signedUV.x + signedUV.y + signedUV.y + 1.0;
-	float solidAngle = 4.0 / (texelSquaredDistance * sqrt(texelSquaredDistance) * SkyboxSize * SkyboxSize);
+		float solidAngle = TexelSolidAngle(signedUV, 2.0 / skyboxSize);
+		vec3 skyboxRadiance = vec3(1, 1, 1);//texture(Skybox, direction).rgb;
 
-	vec3 SkyboxColour = textureLod(Skybox, direction, SkyboxMipLevel).rgb;
+		vec3 factor = solidAngle * skyboxRadiance;
 
-	float Y[9];
-	ComputeSphericalHarmonicBasis(direction, &Y);
+		float Y[9];
+		ComputeSphericalHarmonicBasis(direction, Y);
 
-	for (int i = 0; i < 9; ++i) {
-		SharedBlockHarmonics[gl_LocalInvocationIndex][i] = SkyboxColour * Y[i] * solidAngle;
-	}
-
-	barrier();
-
-	for (uint stride = gl_WorkGroupSize.x * gl_WorkGroupSize.y * 0.5; stride > 0; stride >>= 1) {
-		if (gl_LocalInvocationIndex < stride) {
-			for (int i = 0; i < 9; ++i) {
-				SharedBlockHarmonics[gl_LocalInvocationIndex][i] += SharedBlockHarmonics[gl_LocalInvocationIndex + stride][i];
-			}
+		for (uint i = 0; i < 9; ++i) {
+			LocalHarmonics[gl_LocalInvocationIndex][i] = factor * Y[i];
 		}
 
 		barrier();
-	}
 
-	if (gl_LocalInvocationIndex == 0) {
-		uint blockID = gl_WorkGroupID.x + gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.z * gl_NumWorkGroups.y * gl_NumWorkGroups.z;
-		uint blockOffset = blockID * 9;
+		for (uint stride = uint(gl_WorkGroupSize.x * gl_WorkGroupSize.y * 0.5); stride > 0; stride >>= 1) {
+			if (gl_LocalInvocationIndex < stride) {
+				for (uint i = 0; i < 9; ++i) {
+					LocalHarmonics[gl_LocalInvocationIndex][i] += LocalHarmonics[gl_LocalInvocationIndex + stride][i];
+				}
+			}
 
-		for (int i = 0; i < 9; ++i) {
-			BlockHarmonics[blockOffset + i] = vec4(SharedBlockHarmonics[0][i], 0.0);
+			barrier();
+		}
+
+		if (gl_LocalInvocationIndex == 0) {
+			uint blockIndex = 
+				gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y +
+          		gl_WorkGroupID.y * gl_NumWorkGroups.x + 
+          		gl_WorkGroupID.x;
+			uint offset = blockIndex * 9;
+
+			for (uint i = 0; i < 9; ++i) {
+				BlockHarmonics[offset + i] = LocalHarmonics[0][i];
+			}
 		}
 	}
 }
