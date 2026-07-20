@@ -40,7 +40,7 @@ function Thread.Load()
 	cameraAngles = Vector3.Zero
 
 	cube.Parent = Thread.World
-	--light.Parent = Thread.World
+	light.Parent = Thread.World
 
 	fps.Parent = Thread.Interface
 end

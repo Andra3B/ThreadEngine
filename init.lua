@@ -226,7 +226,7 @@ function lovr.run()
 	Thread.SkyboxUpdateMatrices[6] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(0), 0)):Unpack())	-- +Z
 	Thread.SkyboxUpdateMatrices[7] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(180), 0)):Unpack())	-- -Z
 
-	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/Studio.hdr")
+	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
 
 	Thread.SkyboxBlockHarmonicsBuffer = lovr.graphics.newBuffer({"vec3", layout = "std140"}, 55296)
 
@@ -397,6 +397,7 @@ function lovr.run()
 			windowPass
 		)
 
+		Thread.SkyboxUpdateRenderPass:setCanvas(nil)
 		Thread.SkyboxUpdateRenderPass:reset()
 		Thread.SkyboxUpdateComputePass:reset()
 

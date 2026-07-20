@@ -36,9 +36,11 @@ function World:Draw(pass)
 		pass:setViewPose(1, self._Camera.LovrInverseTransform, true)
 		
 		pass:setColor(1, 1, 1, 1)
-
-		pass:setFaceCull("front")
 		
+		pass:setFaceCull("none")
+		pass:setDepthTest("gequal")
+		pass:setDepthWrite(true)
+
 		pass:setShader(Thread.Shaders.Skybox)
 		pass:send("Skybox", self._Skybox.CubeTexture)
 
@@ -47,9 +49,6 @@ function World:Draw(pass)
 		pass:setFaceCull("back")
 
 		pass:setShader(Thread.Shaders.World)
-
-		pass:setDepthTest("gequal")
-		pass:setDepthWrite(true)
 
 		for descendant in self:IterateDescendants() do
 			if Class.IsA(descendant, "Light") and descendant.WorldStateRefresh then
