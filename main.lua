@@ -17,14 +17,6 @@ function Thread.Load()
 	cube.Position = Vector3.Create(0, 0, -3)
 	light.Position = Vector3.Create(0, 2, 0)
 
-	test = Input.Create("Test", Enum.InputPriority.Lowest)
-	test:SetMapping(Enum.Input.Space)
-	test.Events:Listen("InputChanged", function(input)
-		if input.Direction.Z < 0 then
-			print(unpack(Thread.DefaultSkybox.HarmonicsBuffer:getData(1)))
-		end
-	end)
-
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
 	cameraMovement:SetMapping(Enum.Input.W, Vector3.Forward)
 	cameraMovement:SetMapping(Enum.Input.A, Vector3.Left)
@@ -40,7 +32,7 @@ function Thread.Load()
 	cameraAngles = Vector3.Zero
 
 	cube.Parent = Thread.World
-	light.Parent = Thread.World
+	--light.Parent = Thread.World
 
 	fps.Parent = Thread.Interface
 end

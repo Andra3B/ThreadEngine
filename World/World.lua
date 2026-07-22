@@ -1,5 +1,42 @@
 local World = {}
 
+local function OnDescendantAdded(world, descendant)
+	if Class.IsA(descendant, "Light") then
+		local lightIndex = #world._Lights + 1
+
+		if lightIndex <= 32 then
+			table.insert(world._Lights, descendant)
+			
+			descendant._LightIndex = lightIndex
+			descendant.Changed = Class.NIL
+		end
+	end
+end
+
+local function OnDescendantRemoved(world, descendant)
+	if Class.IsA(descendant, "Light") then
+		local lightIndex = descendant._LightIndex
+
+		if lightIndex ~= 0 then
+			table.remove(world._Lights, lightIndex)
+			descendant._LightIndex = 0
+
+			for object in world:IterateDescendants() do
+				if Class.IsA(object, "Light") and object._LightIndex == 0 then
+					OnDescendantAdded(world, object)
+				end
+			end
+
+			for index = lightIndex, #world._Lights, 1 do
+				local light = world._Lights[index]
+
+				light._LightIndex = index
+				light.Changed = Class.NIL
+			end
+		end
+	end
+end
+
 function World.Create()
 	local self = Class.CreateInstance(WorldObject.Create(), World)
 
@@ -7,23 +44,25 @@ function World.Create()
 
 	self._Skybox = Thread.DefaultSkybox
 
-	self._LightStateBuffer = lovr.graphics.newBuffer({
-		{name = "Position", type = "vec4", length = 32},
-		{name = "Direction", type = "vec4", length = 32},
-		{name = "Intensity", type = "vec4", length = 32},
-		{name = "FallOff", type = "vec4", length = 32},
-		layout = "std140"
+	self._Lights = table.new(0, 32)
+	self._LightBuffer = lovr.graphics.newBuffer({{
+			name = "Lights", length = 32, type = {
+				{name = "Enabled", type = "uint"},
+				{name = "Type", type = "uint"},
+				{name = "FallOffType", type = "uint"},
+				{name = "FallOffCoefficient", type = "float"},
+				{name = "Radius", type = "float"},
+				{name = "Range", type = "float"},
+				{name = "Intensity", type = "vec3"},
+				{name = "Position", type = "vec3"},
+				{name = "Direction", type = "vec3"}
+			}
+		},
+		layout = "std430"
 	})
 
-	self._LightState = {
-		Position = table.new(32, 0),
-		Direction = table.new(32, 0),
-		Intensity = table.new(32, 0),
-		FallOff = table.new(32, 0),
-
-		Lights = table.new(32, 0),
-		Changed = false
-	}
+	self._DescendantAddedListener = self._Events:Listen("DescendantAdded", OnDescendantAdded)
+	self._DescendantRemovedListener = self._Events:Listen("DescendantAdded", OnDescendantRemoved)
 
 	self._Camera.Parent = self
 
@@ -41,8 +80,9 @@ function World:Draw(pass)
 		pass:setDepthTest("gequal")
 		pass:setDepthWrite(true)
 
-		pass:setShader(Thread.Shaders.Skybox)
-		pass:send("Skybox", self._Skybox.CubeTexture)
+		pass:setShader(Thread.Shaders.Cubemap)
+		pass:send("Cubemap", self._Skybox.EnvironmentMap)
+		pass:send("LOD", 0)
 
 		pass:draw(Thread.Meshes.Cube)
 		
@@ -50,22 +90,15 @@ function World:Draw(pass)
 
 		pass:setShader(Thread.Shaders.World)
 
-		for descendant in self:IterateDescendants() do
-			if Class.IsA(descendant, "Light") and descendant.WorldStateRefresh then
-				self:RefreshLight(descendant, false)
-			end
-		end
-
-		if self._LightState.Changed then
-			self._LightStateBuffer:setData(self._LightState)
-			self._LightState.Changed = false
-		end
-
-		pass:send("Lights", self._LightStateBuffer)
-		pass:send("LightCount", #self._LightState.Lights)
-
-		pass:send("Skybox", self._Skybox.CubeTexture)
+		pass:send("Skybox", self._Skybox.EnvironmentMap)
 		pass:send("SkyboxHarmonics", self._Skybox.HarmonicsBuffer)
+		
+		for _, light in ipairs(self._Lights) do
+			light:Upload()
+		end
+
+		pass:send("LightBuffer", self._LightBuffer)
+		pass:send("LightCount", #self._Lights)
 
 		for descendant in self:IterateDescendants() do
 			if Class.IsA(descendant, "Body") then
@@ -103,83 +136,23 @@ function World:SetSkybox(skybox)
 	end
 end
 
-function World:RefreshLight(light, remove)
-	if remove then
-		if light._LightIndex == 0 then
-			return
-		else
-			local lightIndex = 4 * (light._LightIndex - 1) + 1
-
-			table.remove(self._LightState.Position, lightIndex)
-			table.remove(self._LightState.Position, lightIndex)
-			table.remove(self._LightState.Position, lightIndex)
-			table.remove(self._LightState.Position, lightIndex)
-
-			table.remove(self._LightState.Direction, lightIndex)
-			table.remove(self._LightState.Direction, lightIndex)
-			table.remove(self._LightState.Direction, lightIndex)
-			table.remove(self._LightState.Direction, lightIndex)
-
-			table.remove(self._LightState.Intensity, lightIndex)
-			table.remove(self._LightState.Intensity, lightIndex)
-			table.remove(self._LightState.Intensity, lightIndex)
-			table.remove(self._LightState.Intensity, lightIndex)
-
-			table.remove(self._LightState.FallOff, lightIndex)
-			table.remove(self._LightState.FallOff, lightIndex)
-			table.remove(self._LightState.FallOff, lightIndex)
-			table.remove(self._LightState.FallOff, lightIndex)
-
-			table.remove(self._LightState.Lights, lightIndex)
-
-			for _lightIndex = lightIndex, #self._LightState.Lights, 1 do
-				self._LightState.Lights[_lightIndex]._LightIndex = _lightIndex
-			end
-		end
-	else
-		if light._LightIndex == 0 then
-			table.insert(self._LightState.Lights, light)
-
-			light._LightIndex = #self._LightState.Lights
-		end
-
-		local lightIndex = 4 * (light._LightIndex - 1) + 1
-
-		self._LightState.Position[lightIndex] = light.AbsolutePosition.X
-		self._LightState.Position[lightIndex + 1] = light.AbsolutePosition.Y
-		self._LightState.Position[lightIndex + 2] = light.AbsolutePosition.Z
-		self._LightState.Position[lightIndex + 3] = light.Enabled and 1 or 0
-
-		self._LightState.Direction[lightIndex] = light.Forward.X 
-		self._LightState.Direction[lightIndex + 1] = light.Forward.Y
-		self._LightState.Direction[lightIndex + 2] = light.Forward.Z
-		self._LightState.Direction[lightIndex + 3] = light.Radius or 0
-
-		self._LightState.Intensity[lightIndex] = light.Colour.X * light.Intensity
-		self._LightState.Intensity[lightIndex + 1] = light.Colour.Y * light.Intensity
-		self._LightState.Intensity[lightIndex + 2] = light.Colour.Z * light.Intensity
-		self._LightState.Intensity[lightIndex + 3] = 0
-
-		self._LightState.FallOff[lightIndex] = light.LightType
-		self._LightState.FallOff[lightIndex + 1] = light.FallOffType or 0
-		self._LightState.FallOff[lightIndex + 2] = light.FallOffCoefficient or 0
-		self._LightState.FallOff[lightIndex + 3] = light.Range or 0
-	end
-
-	self._LightState.Changed = true
-end
-
 function World:Destroy()
 	if not self._Destroyed then
 		self._Camera = nil
 		
 		self._Skybox = nil
 
-		self._LightStateBuffer:release()
-		self._LightStateBuffer = nil
+		table.erase(self._Lights)
+		self._Lights = nil
 
-		table.erase(self._LightState, nil, false)
-		self._LightState = nil
+		self._LightBuffer:release()
+		self._LightBuffer = nil
+
+		self._DescendantAddedListener:Destroy()
+		self._DescendantAddedListener = nil
+
+		self._DescendantRemovedListener:Destroy()
+		self._DescendantRemovedListener = nil
 
 		WorldObject.Destroy(self)
 	end

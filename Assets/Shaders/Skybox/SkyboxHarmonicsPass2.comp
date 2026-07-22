@@ -1,10 +1,10 @@
 layout(local_size_x = 64, local_size_y = 1, local_size_z = 1) in;
 
-layout(std140) readonly buffer InputBuffer {
+layout(std430) readonly buffer InputBuffer {
 	vec3 BlockHarmonics[];
 };
 
-layout(std140) buffer OutputBuffer {
+layout(std430) buffer OutputBuffer {
 	vec3 Harmonics[9];
 };
 

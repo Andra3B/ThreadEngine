@@ -100,20 +100,21 @@ function Hierarchy:SetParent(parent, where)
 			end
 
 			self._Parent = nil
-			oldParent.Events:Trigger("ChildRemoved", self)
+
+			oldParent.Events:Trigger("DescendantRemoved", self)
+			for ancestor in oldParent:IterateAncestors() do
+				ancestor.Events:Trigger("DescendantRemoved", self)
+			end
 		end
 
 		if parent then
 			table.insert(parent.Children, math.clamp(where or (#parent.Children + 1), 1, #parent.Children + 1), self)
 
 			self._Parent = parent
-			parent.Events:Trigger("ChildAdded", self)
-		end
 
-		self.Events:Trigger("AncestorChanged", parent, oldParent)
-
-		for descendant in self:IterateDescendants() do
-			descendant.Events:Trigger("AncestorChanged", parent, oldParent)
+			for ancestor in self:IterateAncestors() do
+				ancestor.Events:Trigger("DescendantAdded", self)
+			end
 		end
 
 		return true, parent

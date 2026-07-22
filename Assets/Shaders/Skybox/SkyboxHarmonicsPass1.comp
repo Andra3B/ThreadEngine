@@ -1,12 +1,12 @@
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
-layout(std140) writeonly buffer OutputBuffer {
+layout(std430) writeonly buffer OutputBuffer {
 	vec3 BlockHarmonics[];
 };
 
 uniform samplerCube Skybox;
 
-shared vec3 LocalHarmonics[256][9];
+shared vec3 LocalHarmonics[64][9];
 
 float AreaElement(float x, float y) {
     return atan(x * y, sqrt(x * x + y * y + 1.0));
@@ -36,19 +36,19 @@ vec3 FaceUVToDirection(vec2 uv, uint face) {
 
 void ComputeSphericalHarmonicBasis(vec3 direction, inout float Y[9]) {
     // L=0
-    Y[0] = 0.079578; // (0.5 * sqrt(1 / PI))^2
+    Y[0] = 0.886227;
     
     // L=1
-    Y[1] = 0.238733 * direction.y; // (0.5 * sqrt(3 / PI))^2 * y
-    Y[2] = 0.238733 * direction.z; // (0.5 * sqrt(3 / PI))^2 * z
-    Y[3] = 0.238733 * direction.x; // (0.5 * sqrt(3 / PI))^2 * x
+    Y[1] = 1.023327 * direction.y;
+    Y[2] = 1.023327 * direction.z;
+    Y[3] = 1.023327 * direction.x;
     
     // L=2
-    Y[4] = 1.193661 * direction.x * direction.y; // (0.5 * sqrt(15 / PI))^2 * x * y
-    Y[5] = 1.193661 * direction.y * direction.z; // (0.5 * sqrt(15 / PI))^2 * y * z
-    Y[6] = 0.099472 * (3.0 * direction.z * direction.z - 1.0); // (0.25 * sqrt(5 / PI))^2 * (3z^2 - 1)
-    Y[7] = 1.193661 * direction.x * direction.z; // (0.5 * sqrt(15 / PI))^2 * x * z
-    Y[8] = 0.298415 * (direction.x * direction.x - direction.y * direction.y); // (0.25 * sqrt(15 / PI))^2 * (x^2 - y^2)
+    Y[4] = 0.858086 * direction.x * direction.y;
+    Y[5] = 0.858086 * direction.y * direction.z;
+    Y[6] = 0.247708 * (3.0 * direction.z * direction.z - 1.0);
+    Y[7] = 0.858086 * direction.x * direction.z;
+    Y[8] = 0.429043 * (direction.x * direction.x - direction.y * direction.y);
 }
 
 void lovrmain() {
@@ -64,7 +64,7 @@ void lovrmain() {
 		vec3 direction = FaceUVToDirection(signedUV, gl_GlobalInvocationID.z);
 
 		float solidAngle = TexelSolidAngle(signedUV, 2.0 / skyboxSize);
-		vec3 skyboxRadiance = vec3(1, 1, 1);//texture(Skybox, direction).rgb;
+		vec3 skyboxRadiance = texture(Skybox, direction).rgb;
 
 		vec3 factor = solidAngle * skyboxRadiance;
 
@@ -74,29 +74,29 @@ void lovrmain() {
 		for (uint i = 0; i < 9; ++i) {
 			LocalHarmonics[gl_LocalInvocationIndex][i] = factor * Y[i];
 		}
+	}
 
-		barrier();
+	barrier();
 
-		for (uint stride = uint(gl_WorkGroupSize.x * gl_WorkGroupSize.y * 0.5); stride > 0; stride >>= 1) {
-			if (gl_LocalInvocationIndex < stride) {
-				for (uint i = 0; i < 9; ++i) {
-					LocalHarmonics[gl_LocalInvocationIndex][i] += LocalHarmonics[gl_LocalInvocationIndex + stride][i];
-				}
+	for (uint stride = uint(gl_WorkGroupSize.x * gl_WorkGroupSize.y * 0.5); stride > 0; stride >>= 1) {
+		if (gl_LocalInvocationIndex < stride) {
+			for (uint i = 0; i < 9; ++i) {
+				LocalHarmonics[gl_LocalInvocationIndex][i] += LocalHarmonics[gl_LocalInvocationIndex + stride][i];
 			}
-
-			barrier();
 		}
 
-		if (gl_LocalInvocationIndex == 0) {
-			uint blockIndex = 
-				gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y +
-          		gl_WorkGroupID.y * gl_NumWorkGroups.x + 
-          		gl_WorkGroupID.x;
-			uint offset = blockIndex * 9;
+		barrier();
+	}
 
-			for (uint i = 0; i < 9; ++i) {
-				BlockHarmonics[offset + i] = LocalHarmonics[0][i];
-			}
+	if (gl_LocalInvocationIndex == 0) {
+		uint blockIndex = 
+			gl_WorkGroupID.z * gl_NumWorkGroups.x * gl_NumWorkGroups.y +
+       		gl_WorkGroupID.y * gl_NumWorkGroups.x + 
+       		gl_WorkGroupID.x;
+		uint offset = blockIndex * 9;
+
+		for (uint i = 0; i < 9; ++i) {
+			BlockHarmonics[offset + i] = LocalHarmonics[0][i];
 		}
 	}
 }

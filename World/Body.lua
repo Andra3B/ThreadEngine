@@ -4,12 +4,14 @@ function Body.Create()
     local self = Class.CreateInstance(WorldNode.Create(), Body)
 
 	self._Mesh = Thread.Meshes.Cube
+	self._Material = nil
 
     return self
 end
 
 function Body:Draw(pass)
 	if self._Mesh then
+		(self._Material or Thread.DefaultMaterial):SendToPass(pass)
 		pass:draw(self._Mesh, self.LovrTransform, 1)
 	end
 end
@@ -26,9 +28,22 @@ function Body:SetMesh(mesh)
 	end
 end
 
+function Body:GetMaterial()
+	return self._Material
+end
+
+function Body:SetMaterial(material)
+	if material ~= self._Material then
+		self._Material = material
+
+		return true, material
+	end
+end
+
 function Body:Destroy()
     if not self._Destroyed then
 		self._Mesh = nil
+		self._Material = nil
 
 		WorldNode.Destroy(self)
 	end

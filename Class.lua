@@ -31,7 +31,7 @@ end
 Class.__index = Class
 Class.Type = "Class"
 
-Class.NIL = table.new(0, 0)
+Class.NIL = setmetatable(table.new(0, 0), {__tostring = function() return "NIL" end})
 
 Class.INSTANCE_METATABLE = {__index = IndexMetamethod, __newindex = NewIndexMetamethod}
 Class.DEPENDENCIES = {
