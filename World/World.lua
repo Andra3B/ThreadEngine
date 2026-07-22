@@ -76,8 +76,8 @@ function World:Draw(pass)
 		
 		pass:setColor(1, 1, 1, 1)
 		
-		pass:setFaceCull("none")
-		pass:setDepthTest("gequal")
+		pass:setFaceCull("front")
+		pass:setDepthTest("lequal")
 		pass:setDepthWrite(true)
 
 		pass:setShader(Thread.Shaders.Cubemap)
@@ -88,7 +88,7 @@ function World:Draw(pass)
 		
 		pass:setFaceCull("back")
 
-		pass:setShader(Thread.Shaders.World)
+		pass:setShader(Thread.Shaders.WorldTangents)
 
 		pass:send("Skybox", self._Skybox.EnvironmentMap)
 		pass:send("SkyboxHarmonics", self._Skybox.HarmonicsBuffer)

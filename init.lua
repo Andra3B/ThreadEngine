@@ -97,6 +97,7 @@ WorldObject = require("World.WorldObject")
 World = require("World.World")
 WorldNode = require("World.WorldNode")
 Model = require("World.Model")
+Mesh = require("World.Mesh")
 Body = require("World.Body")
 Camera = require("World.Camera")
 Skybox = require("World.Skybox")
@@ -290,7 +291,7 @@ function lovr.run()
 		"Assets/Shaders/Interface/Interface.vert", "Assets/Shaders/Interface/Interface.frag"
 	)
 
-	Thread.Shaders.World = lovr.graphics.newShader(
+	Thread.Shaders.WorldTangents = lovr.graphics.newShader(
 		"Assets/Shaders/World/World.vert", "Assets/Shaders/World/World.frag",
 		{flags = {
 			passColor = true,
@@ -301,6 +302,27 @@ function lovr.run()
 			glow = false,
 			normalMap = false,
 			vertexTangents = true,
+			colorTexture = false,
+			glowTexture = false,
+			metalnessTexture = false,
+			roughnessTexture = false,
+			ambientOcclusion = false,
+			clearcoatTexture = false,
+			tonemap = true
+		}}
+	)
+
+	Thread.Shaders.WorldNoTangents = lovr.graphics.newShader(
+		"Assets/Shaders/World/World.vert", "Assets/Shaders/World/World.frag",
+		{flags = {
+			passColor = true,
+			materialColor = false,
+			vertexColors = true,
+			uvTransform = false,
+			alphaCutoff = false,
+			glow = false,
+			normalMap = false,
+			vertexTangents = false,
 			colorTexture = false,
 			glowTexture = false,
 			metalnessTexture = false,
@@ -486,6 +508,7 @@ function lovr.run()
 		Thread.Interface:Update(deltaTime)
 
 		local windowPass = lovr.graphics.getWindowPass()
+		windowPass:setClear({0, 0, 0, 1, depth = 1})
 
 		Thread.World:Draw(windowPass)
 		Thread.Interface:Draw(windowPass)

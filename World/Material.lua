@@ -18,7 +18,7 @@ function Material.Create()
 	self._NormalScale = 1
 	self._NormalTexture = nil
 
-	self._OcclusionStrength = 1
+	self._OcclusionStrength = 0
 	self._OcclusionTexture = nil
 
 	self._UVShift = Vector2.Zero

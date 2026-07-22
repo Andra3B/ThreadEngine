@@ -1,7 +1,8 @@
 require("init")
 
 function Thread.Load()
-	cube = Body.Create()	
+	helmet = Model.Create("Assets/Models/Helmet.glb")
+	antiqueCamera = Model.Create("Assets/Models/AntiqueCamera.glb")
 	light = PointLight.Create()
 
 	fps = Label.Create()
@@ -14,7 +15,9 @@ function Thread.Load()
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
 
-	cube.Position = Vector3.Create(0, 0, -3)
+	helmet.Position = Vector3.Create(0, 0, -1)
+	antiqueCamera.Position = Vector3.Create(5, 0, -1)
+
 	light.Position = Vector3.Create(0, 2, 0)
 
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
@@ -31,8 +34,9 @@ function Thread.Load()
 
 	cameraAngles = Vector3.Zero
 
-	cube.Parent = Thread.World
-	--light.Parent = Thread.World
+	helmet.Parent = Thread.World
+	antiqueCamera.Parent = Thread.World
+	light.Parent = Thread.World
 
 	fps.Parent = Thread.Interface
 end
