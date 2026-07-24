@@ -184,7 +184,7 @@ local function ThreadQuit(exitCode)
 	table.erase(Thread.CubemapMatrices)
 	Thread.LovrMatrixIdentity = nil
 
-	table.erase(Thread.Meshes, LovrResourceRelease)
+	table.erase(Thread.Meshes, Mesh.Destroy)
 	table.erase(Thread.Shaders, LovrResourceRelease)
 
 	Thread._SkyboxBlockHarmonicsBuffer:release()
@@ -229,7 +229,7 @@ function Thread.UpdateSkybox(skybox)
 		renderPass:setViewPose(5, Thread.CubemapMatrices[6])
 		renderPass:setViewPose(6, Thread.CubemapMatrices[7])
 
-		renderPass:draw(Thread.Meshes.Cube)
+		renderPass:draw(Thread.Meshes.Cube.Mesh)
 
 		table.insert(passes, renderPass)
 		view:release()
@@ -355,7 +355,7 @@ function lovr.run()
 		{flags = {tonemap = true}}
 	)
 
-	Thread.Meshes.Square = lovr.graphics.newMesh({
+	local square = lovr.graphics.newMesh({
 		{name = "VertexPosition", type = "vec2"},
 		{name = "VertexUV", type = "vec2"}
 	}, {
@@ -367,12 +367,14 @@ function lovr.run()
 		storage = "gpu"
 	})
 
-	Thread.Meshes.Square:setIndices({
+	square:setIndices({
 		1, 2, 3,
 		1, 3, 4
 	})
 
-	Thread.Meshes.Cube = lovr.graphics.newMesh({
+	Thread.Meshes.Square = Mesh.Create(square)
+
+	local cube = lovr.graphics.newMesh({
 		{name = "VertexPosition", type = "vec3"},
 		{name = "VertexNormal", type = "vec3"},
 		{name = "VertexUV", type = "vec2"}
@@ -416,7 +418,7 @@ function lovr.run()
 		storage = "gpu"
 	})
 
-	Thread.Meshes.Cube:setIndices({
+	cube:setIndices({
 		-- Front face
         1, 2, 3,    3, 4, 1,
         -- Back face
@@ -431,6 +433,8 @@ function lovr.run()
         21, 22, 23, 23, 24, 21
 	})
 	
+	Thread.Meshes.Cube = Mesh.Create(cube)
+
 	Thread.LovrMatrixIdentity = lovr.math.newMat4()
 
 	Thread.CubemapMatrices[1] = lovr.math.newMat4(Matrix4.CreatePerspectiveProjection(1, math.rad(90), 0.1, 1):Unpack())

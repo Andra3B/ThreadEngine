@@ -192,7 +192,7 @@ local function CreateFromFile(path)
 
 				local angle, axisX, axisY, axisZ = modelData:getNodeOrientation(index)
 				body.Position = Vector3.Create(modelData:getNodePosition(index))
-				body.Size = Vector3.Create(modelData:getNodeScale(index))
+				body.Scale = Vector3.Create(modelData:getNodeScale(index))
 				body.Orientation = Quaternion.CreateAxisRotation(angle, Vector3.Create(axisX, axisY, axisZ))
 
 				bodies[index] = body

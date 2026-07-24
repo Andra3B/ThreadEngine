@@ -29,7 +29,7 @@ function Frame:Draw(pass)
 
 	pass:setColor(self._BackgroundColour:Unpack())
 
-    pass:draw(Thread.Meshes.Square, self.LovrTransform, 1)
+    pass:draw(Thread.Meshes.Square.Mesh, self.LovrTransform, 1)
 end
 
 --[[DependsOn: Position, Parent, ParentAbsoluteSize, ParentAbsolutePosition, ParentAbsoluteAngle, AbsoluteOrigin, Angle]]--

@@ -29,12 +29,19 @@ function Body:Draw(pass)
 				end
 			end
 		else
-			for partIndex = 1, #self._Mesh.Parts, 1 do
-				local mesh, material = self._Mesh:GetMesh(partIndex)
-				material = material or self._Material or Thread.DefaultMaterial
+			if #self._Mesh.Parts > 0 then
+				for partIndex = 1, #self._Mesh.Parts, 1 do
+					local mesh, material = self._Mesh:GetMesh(partIndex)
+					material = material or self._Material or Thread.DefaultMaterial
+
+					material:SendToPass(pass)
+					pass:draw(mesh, self.LovrTransform, 1)
+				end
+			else
+				local material = self._Material or Thread.DefaultMaterial
 
 				material:SendToPass(pass)
-				pass:draw(mesh, self.LovrTransform, 1)
+				pass:draw(self._Mesh.Mesh, self.LovrTransform, 1)
 			end
 		end
 	end

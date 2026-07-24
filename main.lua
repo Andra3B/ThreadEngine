@@ -1,9 +1,7 @@
 require("init")
 
 function Thread.Load()
-	helmet = Model.Create("Assets/Models/Helmet.glb")
-	antiqueCamera = Model.Create("Assets/Models/AntiqueCamera.glb")
-	light = PointLight.Create()
+	cube = Body.Create()
 
 	fps = Label.Create()
 
@@ -15,10 +13,7 @@ function Thread.Load()
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
 
-	helmet.Position = Vector3.Create(0, 0, -1)
-	antiqueCamera.Position = Vector3.Create(5, 0, -1)
-
-	light.Position = Vector3.Create(0, 2, 0)
+	cube.Position = Vector3.Create(0, 0, -2)
 
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
 	cameraMovement:SetMapping(Enum.Input.W, Vector3.Forward)
@@ -29,14 +24,12 @@ function Thread.Load()
 	cameraMovement:SetMapping(Enum.Input.Q, Vector3.Down)
 
 	cameraRotate = Input.Create("CameraRotate", Enum.InputPriority.Lowest)
-	cameraRotate:SetMapping(Enum.Input.RightMouseButton, Vector3.Forward)
+	cameraRotate:SetMapping(Enum.Input.RightMouseButton)
 	cameraRotate:SetMapping(Enum.Input.MouseMovement)
 
 	cameraAngles = Vector3.Zero
 
-	helmet.Parent = Thread.World
-	antiqueCamera.Parent = Thread.World
-	light.Parent = Thread.World
+	cube.Parent = Thread.World
 
 	fps.Parent = Thread.Interface
 end

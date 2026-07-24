@@ -22,6 +22,19 @@ function WorldNode:GetAbsolutePosition()
     return self._AbsolutePosition
 end
 
+--[[DependsOn: Scale, Parent, ParentAbsoluteScale]]--
+function WorldNode:GetAbsoluteScale()
+	if self._AbsoluteScale == Class.NIL then
+		if Class.IsA(self._Parent, "WorldObject") then
+			self._AbsoluteScale = self._Parent.AbsoluteScale * self._Scale
+		else
+			self._AbsoluteScale = self._Scale
+		end
+	end
+
+	return self._AbsoluteScale
+end
+
 --[[DependsOn: Orientation, Parent, ParentAbsoluteOrientation]]--
 function WorldNode:GetAbsoluteOrientation()
     if self._AbsoluteOrientation == Class.NIL then
@@ -47,10 +60,10 @@ function WorldNode:SetOrigin(origin)
     end
 end
 
---[[DependsOn: Origin, AbsoluteSize]]--
+--[[DependsOn: Origin, AbsoluteScale]]--
 function WorldNode:GetAbsoluteOrigin()
     if self._AbsoluteOrigin == Class.NIL then
-        self._AbsoluteOrigin = self._Origin.Offset + self.AbsoluteSize * self._Origin.Scale
+        self._AbsoluteOrigin = self._Origin.Offset + self.AbsoluteScale * self._Origin.Scale
     end
 
     return self._AbsoluteOrigin
@@ -64,13 +77,13 @@ function WorldNode:SetAbsoluteOrigin(origin)
     end
 end
 
---[[DependsOn: AbsolutePosition, AbsoluteSize, AbsoluteOrientation, AbsoluteOrigin]]--
+--[[DependsOn: AbsolutePosition, AbsoluteScale, AbsoluteOrientation, AbsoluteOrigin]]--
 function WorldNode:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
             self.AbsolutePosition,
             self.AbsoluteOrientation,
-            self.AbsoluteSize,
+            self.AbsoluteScale,
             self.AbsoluteOrigin
         )
 	end
@@ -81,7 +94,7 @@ end
 function WorldNode:Destroy()
     if not self._Destroyed then
 		self._AbsolutePosition = nil
-		self._AbsoluteSize = nil
+		self._AbsoluteScale = nil
 		self._AbsoluteOrientation = nil
 
 		self._Origin = nil

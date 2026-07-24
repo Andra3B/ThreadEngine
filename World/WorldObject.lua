@@ -6,8 +6,8 @@ function WorldObject.Create()
 	self._Position = Vector3.Zero
 	self._AbsolutePosition = Class.NIL
 	
-	self._Size = Vector3.One
-    self._AbsoluteSize = Class.NIL
+	self._Scale = Vector3.One
+    self._AbsoluteScale = Class.NIL
 	
 	self._Orientation = Quaternion.One
     self._AbsoluteOrientation = Class.NIL
@@ -51,32 +51,32 @@ function WorldObject:SetAbsolutePosition(position)
 	end
 end
 
-function WorldObject:GetSize()
-	return self._Size
+function WorldObject:GetScale()
+	return self._Scale
 end
 
-function WorldObject:SetSize(size)
-	if size ~= self._Size then
-		self._Size = size
+function WorldObject:SetScale(scale)
+	if scale ~= self._Scale then
+		self._Scale = scale
 
-		return true, size
+		return true, scale
 	end
 end
 
---[[DependsOn: Size]]--
-function WorldObject:GetAbsoluteSize()
-    if self._AbsoluteSize == Class.NIL then
-        self._AbsoluteSize = self._Size
+--[[DependsOn: Scale]]--
+function WorldObject:GetAbsoluteScale()
+    if self._AbsoluteScale == Class.NIL then
+        self._AbsoluteScale = self._Scale
     end
 
-    return self._AbsoluteSize
+    return self._AbsoluteScale
 end
 
-function WorldObject:SetAbsoluteSize(size)
-	if size ~= self._AbsoluteSize then
-		self._AbsoluteSize = size
+function WorldObject:SetAbsoluteScale(scale)
+	if scale ~= self._AbsoluteScale then
+		self._AbsoluteScale = scale
 		
-		return true, size
+		return true, scale
 	end
 end
 
@@ -126,13 +126,13 @@ function WorldObject:SetForward(forward)
 	end
 end
 
---[[DependsOn: AbsolutePosition, AbsoluteSize, AbsoluteOrientation]]--
+--[[DependsOn: AbsolutePosition, AbsoluteScale, AbsoluteOrientation]]--
 function WorldObject:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
             self.AbsolutePosition,
             self.AbsoluteOrientation,
-            self.AbsoluteSize,
+            self.AbsoluteScale,
             Vector3.Zero
         )
 	end
@@ -204,8 +204,8 @@ function WorldObject:Destroy()
 		self._Position = nil
 		self._AbsolutePosition = nil
 
-		self._Size = nil
-		self._AbsoluteSize = nil
+		self._Scale = nil
+		self._AbsoluteScale = nil
 
 		self._Orientation = nil
 		self._AbsoluteOrientation = nil

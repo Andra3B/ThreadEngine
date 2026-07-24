@@ -51,9 +51,9 @@ function Matrix4.CreateIdentity()
 	})
 end
 
-function Matrix4.CreateTransform(position, orientation, size, origin)
+function Matrix4.CreateTransform(position, orientation, scale, origin)
 	position = position or Vector3.Zero
-	size = size or Vector3.One
+	scale = scale or Vector3.One
 	origin = origin or Vector3.Zero
 
 	if not orientation then
@@ -62,11 +62,11 @@ function Matrix4.CreateTransform(position, orientation, size, origin)
 		orientation = Quaternion.CreateYXZRotation(orientation)
 	end
 
-	-- Combined origin offset and size matrix
+	-- Combined origin offset and scale matrix
 	local result = Matrix4.Create({
-		size.X, 0, 0, 0,
-		0, size.Y, 0, 0,
-		0, 0, size.Z, 0,
+		scale.X, 0, 0, 0,
+		0, scale.Y, 0, 0,
+		0, 0, scale.Z, 0,
 		-origin.X, -origin.Y, -origin.Z, 1
 	})
 
