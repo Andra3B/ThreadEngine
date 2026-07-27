@@ -221,7 +221,7 @@ function Model.Create(path)
 	if path then
 		return CreateFromFile(path)
 	else
-		local self = Class.CreateInstance(WorldNode.Create(), Model)
+		local self = Class.CreateInstance(WorldObject.Create(), Model)
 
 		return self
 	end
@@ -229,8 +229,8 @@ end
 
 function Model:Destroy()
 	if not self._Destroyed then
-		WorldNode.Destroy(self)
+		WorldObject.Destroy(self)
 	end
 end
 
-return Class.CreateClass(Model, "Model", WorldNode)
+return Class.CreateClass(Model, "Model", WorldObject)

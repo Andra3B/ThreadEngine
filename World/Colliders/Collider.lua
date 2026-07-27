@@ -27,6 +27,8 @@ function Collider:Refresh()
 		elseif world then
 			self.Collider = world.PhysicsWorld:newCollider(0, 0, 0)
 
+			self._Collider:setEnabled(self._Enabled)
+
 			self._Collider:setPose(
 				self._Body.AbsolutePosition.X, self._Body.AbsolutePosition.Y, self._Body.AbsolutePosition.Z,
 				self._Body.AbsoluteOrientation:GetAngleAxis(true)
@@ -38,7 +40,9 @@ function Collider:Refresh()
 			self._Collider:setFriction(self._Body._Friction)
 			self._Collider:setRestitution(self._Body._Restitution)
 
-			self._Collider:setDensity(self._Body._Density)
+			if type(self._Shape) == "userdata" then
+				self._Shape:setDensity(self._Body._Density)
+			end
 
 			self._Collider:setKinematic(self._Body._Kinematic)
 
@@ -96,21 +100,10 @@ function Collider:SetCollider(collider)
 	if collider ~= self._Collider then
 		self.Shape = nil
 
-		self._Collider:setUserData(nil)
-		self._Collider:destroy()
-		self._Collider:release()
-		
-		if collider then
-			collider:setEnabled(self._Enabled)
-
-			if self._Body then
-				collider:setPose(
-					self._Body.AbsolutePosition.X, self._Body.AbsolutePosition.Y, self._Body.AbsolutePosition.Z,
-					self._Body.AbsoluteOrientation:GetAngleAxis(true)
-				)
-
-				collider:setUserData(self._Body)
-			end
+		if self._Collider then
+			self._Collider:setUserData(nil)
+			self._Collider:destroy()
+			self._Collider:release()
 		end
 
 		self._Collider = collider
@@ -149,10 +142,6 @@ end
 
 function Collider:SetBody(body)
 	if body ~= self._Body then
-		if self._Collider then
-			self._Collider:setUserData(body)
-		end
-
 		self._Body = body
 		
 		return true, body

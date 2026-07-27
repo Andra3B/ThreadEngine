@@ -13,21 +13,7 @@ function CompoundCollider:Refresh()
 
 	if world and not self._Shape then
 		for _, collider in pairs(self._Colliders) do
-			if collider._Collider then
-				if type(self._Shape) == "userdata" then
-					self._Shape:destroy()
-					self._Shape:release()
-				end
-				
-				self._Shape = nil
-				
-				self._Collider:setUserData(nil)
-				self._Collider:destroy()
-				self._Collider:release()
-				self._Collider = nil
-			end
-
-			collider._Collider = self._Collider
+			collider.Collider = self._Collider
 
 			collider:Refresh()
 		end

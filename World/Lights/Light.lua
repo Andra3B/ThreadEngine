@@ -14,7 +14,7 @@ Enum.LightType = Enum.Create({
 })
 
 function Light.Create()
-	local self = Class.CreateInstance(WorldNode.Create(), Light)
+	local self = Class.CreateInstance(WorldObject.Create(), Light)
 
 	self._Colour = Vector3.One
 	self._Intensity = 3
@@ -142,8 +142,8 @@ function Light:Destroy()
 	if not self._Destroyed then
 		self._Colour = nil
 
-		WorldNode.Destroy(self)
+		WorldObject.Destroy(self)
 	end
 end
 
-return Class.CreateClass(Light, "Light", WorldNode, scriptpath())
+return Class.CreateClass(Light, "Light", WorldObject, scriptpath())

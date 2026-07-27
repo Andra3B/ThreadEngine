@@ -110,6 +110,10 @@ function World:Update(deltaTime)
 
 	self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate + deltaTime
 
+	for descendant in self:IterateDescendants() do
+		descendant:Update(deltaTime)
+	end
+
 	while self._TimeSincePhysicsUpdate >= self._PhysicsUpdatePeriod do
 		self._PhysicsWorld:update(self._PhysicsUpdatePeriod)
 		

@@ -1,7 +1,7 @@
 local Body = {}
 
 function Body.Create()
-    local self = Class.CreateInstance(WorldNode.Create(), Body)
+    local self = Class.CreateInstance(WorldObject.Create(), Body)
 
 	self._Mesh = nil
 	self._MeshParts = {}
@@ -33,13 +33,13 @@ function Body.Create()
 end
 
 function Body:Update(deltaTime)
-	WorldNode.Update(self, deltaTime)
+	WorldObject.Update(self, deltaTime)
 
 	if self._Collider then
 		local collider = self._Collider.Collider
 
-		self.Position = Vector3.Create(collider:getPosition())
-		self.Orientation = Quaternion.CreateAxisRotation(collider:getOrientation())
+		self.AbsolutePosition = Vector3.Create(collider:getPosition())
+		self.AbsoluteOrientation = Quaternion.CreateAxisRotation(collider:getOrientation())
 	end
 end
 
@@ -123,7 +123,7 @@ function Body:SetCollider(collider)
 	if collider ~= self._Collider then
 		collider.Body = self
 		collider:Refresh()
-
+		
 		self._Collider = collider
 		
 		return true, collider
@@ -410,8 +410,8 @@ function Body:Destroy()
 		self._Collider:Destroy()
 		self._Collider = nil
 
-		WorldNode.Destroy(self)
+		WorldObject.Destroy(self)
 	end
 end
 
-return Class.CreateClass(Body, "Body", WorldNode, scriptpath())
+return Class.CreateClass(Body, "Body", WorldObject, scriptpath())

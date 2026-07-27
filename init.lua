@@ -95,7 +95,6 @@ Input = require("Input")
 
 WorldObject = require("World.WorldObject")
 World = require("World.World")
-WorldNode = require("World.WorldNode")
 Model = require("World.Model")
 Mesh = require("World.Mesh")
 Body = require("World.Body")

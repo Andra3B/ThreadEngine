@@ -7,12 +7,17 @@ function WorldObject.Create()
 	self._AbsolutePosition = Class.NIL
 	
 	self._Scale = Vector3.One
-    self._AbsoluteScale = Class.NIL
+	self._AbsoluteScale = Class.NIL
 	
 	self._Orientation = Quaternion.One
-    self._AbsoluteOrientation = Class.NIL
+	self._AbsoluteOrientation = Class.NIL
+
+	self._Origin = ScaleOffset3.Zero
+	self._AbsoluteOrigin = Class.NIL
 
 	self._Forward = Class.NIL
+	self._Right = Class.NIL
+	self._Up = Class.NIL
 
 	self._Transform = Class.NIL
 	self._InverseTransform = Class.NIL
@@ -34,10 +39,14 @@ function WorldObject:SetPosition(position)
 	end
 end
 
---[[DependsOn: Position]]--
+--[[DependsOn: Position, Parent, ParentAbsolutePosition]]--
 function WorldObject:GetAbsolutePosition()
     if self._AbsolutePosition == Class.NIL then
-        self._AbsolutePosition = self._Position
+        if Class.IsA(self._Parent, "WorldObject") then
+            self._AbsolutePosition = self._Parent.AbsolutePosition + self._Position
+        else
+            self._AbsolutePosition = self._Position
+        end
     end
 
     return self._AbsolutePosition
@@ -45,6 +54,14 @@ end
 
 function WorldObject:SetAbsolutePosition(position)
 	if position ~= self._AbsolutePosition then
+		if position ~= Class.NIL then
+			if Class.IsA(self._Parent, "WorldObject") then
+				self.Position = position - self._Parent.AbsolutePosition
+			else
+				self.Position = position
+			end
+		end
+
 		self._AbsolutePosition = position
 		
 		return true, position
@@ -63,17 +80,29 @@ function WorldObject:SetScale(scale)
 	end
 end
 
---[[DependsOn: Scale]]--
+--[[DependsOn: Scale, Parent, ParentAbsoluteScale]]--
 function WorldObject:GetAbsoluteScale()
-    if self._AbsoluteScale == Class.NIL then
-        self._AbsoluteScale = self._Scale
-    end
+	if self._AbsoluteScale == Class.NIL then
+		if Class.IsA(self._Parent, "WorldObject") then
+			self._AbsoluteScale = self._Parent.AbsoluteScale * self._Scale
+		else
+			self._AbsoluteScale = self._Scale
+		end
+	end
 
-    return self._AbsoluteScale
+	return self._AbsoluteScale
 end
 
 function WorldObject:SetAbsoluteScale(scale)
 	if scale ~= self._AbsoluteScale then
+		if scale ~= Class.NIL then
+			if Class.IsA(self._Parent, "WorldObject") then
+				self.Scale = scale / self._Parent.AbsoluteScale
+			else
+				self.Scale = scale
+			end
+		end
+
 		self._AbsoluteScale = scale
 		
 		return true, scale
@@ -92,21 +121,62 @@ function WorldObject:SetOrientation(orientation)
 	end
 end
 
---[[DependsOn: Orientation]]--
+--[[DependsOn: Orientation, Parent, ParentAbsoluteOrientation]]--
 function WorldObject:GetAbsoluteOrientation()
     if self._AbsoluteOrientation == Class.NIL then
-        self._AbsoluteOrientation = self._Orientation
-    end
+        if Class.IsA(self._Parent, "WorldObject") then
+			self._AbsoluteOrientation = self._Orientation * self._Parent.AbsoluteOrientation
+		else
+			self._AbsoluteOrientation = self._Orientation
+		end
+	end
 
-    return self._AbsoluteOrientation
+	return self._AbsoluteOrientation
 end
 
 function WorldObject:SetAbsoluteOrientation(orientation)
 	if orientation ~= self._AbsoluteOrientation then
+		if orientation ~= Class.NIL then
+        	if Class.IsA(self._Parent, "WorldObject") then
+				self.Orientation = orientation / self._Parent.AbsoluteOrientation
+			else
+				self.Orientation = orientation
+			end
+		end
+
 		self._AbsoluteOrientation = orientation
 		
 		return true, orientation
 	end
+end
+
+function WorldObject:GetOrigin()
+    return self._Origin
+end
+
+function WorldObject:SetOrigin(origin)
+	if origin ~= self._Origin then
+		self._Origin = origin
+
+		return true, origin
+	end
+end
+
+--[[DependsOn: Origin, AbsoluteScale]]--
+function WorldObject:GetAbsoluteOrigin()
+    if self._AbsoluteOrigin == Class.NIL then
+        self._AbsoluteOrigin = self._Origin.Offset + self.AbsoluteScale * self._Origin.Scale
+    end
+
+    return self._AbsoluteOrigin
+end
+
+function WorldObject:SetAbsoluteOrigin(origin)
+    if origin ~= self._AbsoluteOrigin then
+        self._AbsoluteOrigin = origin
+
+        return true, origin
+    end
 end
 
 --[[DependsOn: AbsoluteOrientation]]--
@@ -126,14 +196,48 @@ function WorldObject:SetForward(forward)
 	end
 end
 
---[[DependsOn: AbsolutePosition, AbsoluteScale, AbsoluteOrientation]]--
+--[[DependsOn: AbsoluteOrientation]]--
+function WorldObject:GetRight()
+	if self._Right == Class.NIL then
+		self._Right = Vector3.Right:Rotate(self.AbsoluteOrientation)
+	end
+
+	return self._Right
+end
+
+function WorldObject:SetRight(right)
+	if right ~= self._Right then
+		self._Right = right
+
+		return true, right
+	end
+end
+
+--[[DependsOn: AbsoluteOrientation]]--
+function WorldObject:GetUp()
+	if self._Up == Class.NIL then
+		self._Up = Vector3.Up:Rotate(self.AbsoluteOrientation)
+	end
+
+	return self._Up
+end
+
+function WorldObject:SetUp(up)
+	if up ~= self._Up then
+		self._Up = up
+
+		return true, up
+	end
+end
+
+--[[DependsOn: AbsolutePosition, AbsoluteScale, AbsoluteOrientation, AbsoluteOrigin]]--
 function WorldObject:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
             self.AbsolutePosition,
             self.AbsoluteOrientation,
             self.AbsoluteScale,
-            Vector3.Zero
+            self.AbsoluteOrigin
         )
 	end
 
@@ -209,6 +313,13 @@ function WorldObject:Destroy()
 
 		self._Orientation = nil
 		self._AbsoluteOrientation = nil
+
+		self._Origin = nil
+		self._AbsoluteOrigin = nil
+
+		self._Forward = nil
+		self._Right = nil
+		self._Up = nil
 
 		self._Transform = nil
 		self._InverseTransform = nil

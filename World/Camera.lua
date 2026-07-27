@@ -1,7 +1,7 @@
 local Camera = {}
 
 function Camera.Create()
-	local self = Class.CreateInstance(WorldNode.Create(), Camera)
+	local self = Class.CreateInstance(WorldObject.Create(), Camera)
 
 	self._FieldOfView = math.rad(90)
 
@@ -74,8 +74,8 @@ function Camera:Destroy()
 	if not self._Destroyed then
 		self._Projection = nil
 
-		WorldNode.Destroy(self)
+		WorldObject.Destroy(self)
 	end
 end
 
-return Class.CreateClass(Camera, "Camera", WorldNode, scriptpath())
+return Class.CreateClass(Camera, "Camera", WorldObject, scriptpath())
