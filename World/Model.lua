@@ -211,10 +211,6 @@ local function CreateFromFile(path)
 			end
 		end
 
-		table.erase(bodies)
-		table.erase(meshes)
-		table.erase(materials)
-
 		modelData:release()
 
 		return model

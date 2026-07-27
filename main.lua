@@ -1,11 +1,10 @@
 require("init")
 
+local fpsLabel = nil
+local cube = nil
+
 function Thread.Load()
-	cube = Body.Create()
-
 	fps = Label.Create()
-
-	fps.Name = "FPS Label"
 
 	fps.Size = ScaleOffset2.Create(0, 0, 150, 50)
 	fps.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
@@ -13,7 +12,25 @@ function Thread.Load()
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
 
-	cube.Position = Vector3.Create(0, 0, -2)
+	local floorCollider = BoxCollider.Create()
+	floorCollider.Size = Vector3.Create(20, 1, 20)
+
+	local cubeCollider = BoxCollider.Create()
+	cubeCollider.Size = Vector3.One
+
+	local floor = Body.Create()
+	cube = Body.Create()
+
+	floor.Mesh = Thread.Meshes.Cube
+	floor.Collider = floorCollider
+
+	cube.Mesh = Thread.Meshes.Cube
+	cube.Collider = cubeCollider
+
+	floor.Scale = Vector3.Create(20, 1, 20)
+
+	floor.Position = Vector3.Create(0, -0.5, 0)
+	cube.Position = Vector3.Create(0, 2, 0)
 
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
 	cameraMovement:SetMapping(Enum.Input.W, Vector3.Forward)
@@ -24,14 +41,16 @@ function Thread.Load()
 	cameraMovement:SetMapping(Enum.Input.Q, Vector3.Down)
 
 	cameraRotate = Input.Create("CameraRotate", Enum.InputPriority.Lowest)
-	cameraRotate:SetMapping(Enum.Input.RightMouseButton)
+	cameraRotate:SetMapping(Enum.Input.LeftAlt)
 	cameraRotate:SetMapping(Enum.Input.MouseMovement)
 
 	cameraAngles = Vector3.Zero
-
-	cube.Parent = Thread.World
+	
+	Thread.World.Camera.Position = Vector3.Create(0, 1, -2)
 
 	fps.Parent = Thread.Interface
+	floor.Parent = Thread.World
+	cube.Parent = Thread.World
 end
 
 function Thread.Update(deltaTime)

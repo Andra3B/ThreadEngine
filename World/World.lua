@@ -1,7 +1,14 @@
 local World = {}
 
+local worldResults = nil
+local worldResultsCount = nil
+
 local function OnDescendantAdded(world, descendant)
-	if Class.IsA(descendant, "Light") then
+	if Class.IsA(descendant, "Body") then
+		if descendant.Collider then
+			descendant.Collider:Refresh()
+		end
+	elseif Class.IsA(descendant, "Light") then
 		local lightIndex = #world._Lights + 1
 
 		if lightIndex <= 32 then
@@ -14,7 +21,11 @@ local function OnDescendantAdded(world, descendant)
 end
 
 local function OnDescendantRemoved(world, descendant)
-	if Class.IsA(descendant, "Light") then
+	if Class.IsA(descendant, "Body") then
+		if descendant.Collider then
+			descendant.Collider:Refresh()
+		end
+	elseif Class.IsA(descendant, "Light") then
 		local lightIndex = descendant._LightIndex
 
 		if lightIndex ~= 0 then
@@ -38,11 +49,11 @@ local function OnDescendantRemoved(world, descendant)
 end
 
 local function OnCollisionStarted(colliderOne, colliderTwo, contact)
-
+	print("Collision Started")
 end
 
 local function OnCollisionFinished(colliderOne, colliderTwo)
-
+	print("Collision Finished")
 end
 
 function World.Create(tags)
@@ -64,7 +75,7 @@ function World.Create(tags)
 		contact = nil
 	})
 
-	self._Gravity = Vector3.Create(self._PhysicsUpdatePeriod:getGravity())
+	self._Gravity = Vector3.Create(self._PhysicsWorld:getGravity())
 
 	self._TimeSincePhysicsUpdate = 0
 	self._PhysicsUpdatePeriod = 1 / 30
@@ -94,104 +105,24 @@ function World.Create(tags)
 	return self
 end
 
-local raycastResults = nil
-local intersections = 0
-local function RaycastCallback(collider, shape, x, y, z, normalX, normalY, normalZ, triangleIndex, relativeDistance)
-	intersections = intersections + 1
-
-	for i, intersection in ipairs(raycastResults) do
-		if relativeDistance <= intersection.RelativeDistance then
-			for j = #raycastResults - 1, i, -1 do
-				local currentIntersection = raycastResults[j]
-				local nextIntersection = raycastResults[j + 1]
-
-				nextIntersection.Collider = currentIntersection.Collider
-
-				nextIntersection.Position.X = currentIntersection.Position.X
-				nextIntersection.Position.Y = currentIntersection.Position.Y
-				nextIntersection.Position.Z = currentIntersection.Position.Z
-
-				nextIntersection.Normal.X = currentIntersection.Normal.X
-				nextIntersection.Normal.Y = currentIntersection.Normal.Y
-				nextIntersection.Normal.Z = currentIntersection.Normal.Z
-
-				nextIntersection.RelativeDistance = currentIntersection.RelativeDistance
-			end
-
-			intersection.Collider = collider
-
-			intersection.Position.X = x
-			intersection.Position.Y = y
-			intersection.Position.Z = z
-
-			intersection.Normal.X = normalX
-			intersection.Normal.Y = normalY
-			intersection.Normal.Z = normalZ
-
-			intersection.Fraction = fraction
-
-			break
-		end
-	end
-
-	if intersections >= #raycastResults then
-		return raycastResults[#raycastResults].fraction
-	else
-		return 1
-	end
-end
-
-function World:Raycast(origin, direction, length, filter, intersectionCount)
-	intersectionCount = math.max(intersectionCount or 1, 1)
-	local to = origin + (direction * length)
-
-	
-	if intersectionCount == 1 then
-		local collider, shape, x, y, z, normalX, normalY, normalZ, triangleIndex = self._PhysicsWorld:raycast(
-			origin.X, origin.Y, origin.Z,
-			to.X, to.Y, to.Z,
-			filter
-		)
-
-		return {{
-			Collider = collider,
-			Position = Vector3.Create(x, y, z),
-			Normal = Vector3.Create(normalX, normalY, normalZ),
-			RelativeDistance = ((x - origin.X)^2 + (y - origin.Y)^2 + (z - origin.Z)^2) / length
-		}}
-	else
-		local results = {}
-
-		for _ = 1, intersectionCount, 1 do
-			table.insert(results, {RelativeDistance = math.huge})
-		end
-
-		raycastResults = results
-		intersections = 0
-
-		self._PhysicsWorld:raycast(
-			origin.X, origin.Y, origin.Z,
-			to.X, to.Y, to.Z,
-			filter,
-			RaycastCallback
-		)
-
-		raycastResults = nil
-
-		return results 
-	end
-end
-
 function World:Update(deltaTime)
+	WorldObject.Update(self, deltaTime)
+
 	self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate + deltaTime
 
-	while self._TimeSincePhysicsUpdate >= self._PhysicsUpdatePeriod then
+	while self._TimeSincePhysicsUpdate >= self._PhysicsUpdatePeriod do
 		self._PhysicsWorld:update(self._PhysicsUpdatePeriod)
+		
+		for descendant in self:IterateDescendants() do
+			if descendant.PostPhysicsUpdate then
+				descendant:PhysicsUpdate(self._TimeSincePhysicsUpdate)
+			end
+		end
 
 		self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate - self._PhysicsUpdatePeriod
 	end
 
-	world:interpolate(self._TimeSincePhysicsUpdate / self._PhysicsUpdatePeriod)
+	self._PhysicsWorld:interpolate(self._TimeSincePhysicsUpdate / self._PhysicsUpdatePeriod)
 end
 
 function World:Draw(pass)
@@ -235,6 +166,237 @@ function World:Draw(pass)
 	end
 end
 
+local function RaycastCallback(collider, shape, x, y, z, normalX, normalY, normalZ, triangleIndex, relativeDistance)
+	worldResultsCount = worldResultsCount + 1
+
+	for i, intersection in ipairs(worldResults) do
+		if relativeDistance <= intersection.RelativeDistance then
+			for j = #worldResults - 1, i, -1 do
+				local currentIntersection = worldResults[j]
+				local nextIntersection = worldResults[j + 1]
+
+				nextIntersection.Body = currentIntersection.Body
+
+				nextIntersection.Position.X = currentIntersection.Position.X
+				nextIntersection.Position.Y = currentIntersection.Position.Y
+				nextIntersection.Position.Z = currentIntersection.Position.Z
+
+				nextIntersection.Normal.X = currentIntersection.Normal.X
+				nextIntersection.Normal.Y = currentIntersection.Normal.Y
+				nextIntersection.Normal.Z = currentIntersection.Normal.Z
+
+				nextIntersection.RelativeDistance = currentIntersection.RelativeDistance
+			end
+
+			intersection.Body = collider:getUserData()
+
+			intersection.Position.X = x
+			intersection.Position.Y = y
+			intersection.Position.Z = z
+
+			intersection.Normal.X = normalX
+			intersection.Normal.Y = normalY
+			intersection.Normal.Z = normalZ
+
+			intersection.Fraction = fraction
+
+			break
+		end
+	end
+
+	if intersections >= #worldResults then
+		return worldResults[#worldResults].fraction
+	else
+		return 1
+	end
+end
+
+function World:Raycast(origin, direction, length, filter, intersectionCount)
+	intersectionCount = math.max(intersectionCount or 1, 1)
+	local to = origin + (direction * length)
+
+	if intersectionCount == 1 then
+		local collider, shape, x, y, z, normalX, normalY, normalZ, triangleIndex, relativeDistance = self._PhysicsWorld:raycast(
+			origin.X, origin.Y, origin.Z,
+			to.X, to.Y, to.Z,
+			filter
+		)
+
+		return {{
+			Body = collider:getUserData(),
+			Position = Vector3.Create(x, y, z),
+			Normal = Vector3.Create(normalX, normalY, normalZ),
+			RelativeDistance = relativeDistance
+		}}
+	else
+		worldResults = {}
+		worldResultsCount = 0
+
+		for _ = 1, intersectionCount, 1 do
+			table.insert(worldResults, {RelativeDistance = math.huge})
+		end
+
+		self._PhysicsWorld:raycast(
+			origin.X, origin.Y, origin.Z,
+			to.X, to.Y, to.Z,
+			filter,
+			RaycastCallback
+		)
+
+		local results = worldResults
+		worldResults = nil
+
+		return results 
+	end
+end
+
+function World:Shapecast(shape, position, orientation, direction, length, filter, intersectionCount)
+	local to = position + (direction * length)
+	local angle, axisX, axisY, axisZ = orientation:GetAngleAxis(true)
+
+	if intersectionCount == 1 then
+		local collider, collisionShape, x, y, z, normalX, normalY, normalZ, triangleIndex, relativeDistance = self._PhysicsWorld:shapecast(
+			shape,
+			position.X, position.Y, position.Z,
+			to.X, to.Y, to.Z,
+			angle, axisX, axisY, axisZ,
+			filter
+		)
+
+		return {{
+			Body = collider:getUserData(),
+			Position = Vector3.Create(x, y, z),
+			Normal = Vector3.Create(normalX, normalY, normalZ),
+			RelativeDistance = relativeDistance
+		}}
+	else
+		worldResults = {}
+		worldResultsCount = 0
+
+		for _ = 1, intersectionCount, 1 do
+			table.insert(worldResults, {RelativeDistance = math.huge})
+		end
+
+		self._PhysicsWorld:shapecast(
+			shape,
+			position.X, position.Y, position.Z,
+			to.X, to.Y, to.Z,
+			angle, axisX, axisY, axisZ,
+			filter,
+			RaycastCallback
+		)
+
+		local results = worldResults
+		worldResults = nil
+
+		return results 
+	end
+end
+
+local function OverlappingBodiesCallback(collider, collisionShape, x, y, z, penetrationX, penetrationY, penetrationZ)
+	table.insert(worldResults, {
+		Body = collider:getUserData(),
+		Position = Vector3.Create(x, y, z),
+		Penetration = Vector3.Create(penetrationX, penetrationY, penetrationZ)
+	})
+end
+
+function World:GetOverlappingBodies(shape, position, orientation, filter, detectionDistance, firstOnly)
+	detectionDistance = detectionDistance or 0
+
+	local angle, axisX, axisY, axisZ = orientation:GetAngleAxis(true)
+
+	if firstOnly then
+		local collider, collisionShape, x, y, z, penetrationX, penetrationY, penetrationZ = self._PhysicsWorld:overlapShape(
+			shape,
+			position.X, position.Y, position.Z,
+			angle, axisX, axisY, axisZ,
+			detectionDistance,
+			filter
+		)
+
+		return {{
+			Body = collider:getUserData(),
+			Position = Vector3.Create(x, y, z),
+			Penetration = Vector3.Create(penetrationX, penetrationY, penetrationZ),
+		}}
+	else
+		worldResults = {}
+
+		self._PhysicsWorld:overlapShape(
+			shape,
+			position.X, position.Y, position.Z,
+			angle, axisX, axisY, axisZ,
+			detectionDistance,
+			filter,
+			OverlappingBodiesCallback
+		)
+
+		local results = {}
+		worldResults = nil
+
+		return results
+	end
+end
+
+local function QueryBodiesInShapeCallback(collider)
+	table.insert(worldResults, collider)
+end
+
+function World:QueryBodiesInBox(position, size, filter, firstOnly)
+	bodyCount = math.max(bodyCount or 1, 1)
+
+	if firstOnly then
+		local collider = self._PhysicsWorld:queryBox(
+			position.X, position.Y, position.Z,
+			size.X, size.Y, size.Z,
+			filter 
+		)
+
+		return {collider:getUserData()}
+	else
+		worldResults = results
+
+		self._PhysicsWorld:queryBox(
+			position.X, position.Y, position.Z,
+			size.X, size.Y, size.Z,
+			filter,
+			QueryBodiesInShapeCallback
+		)
+
+		local results = worldResults
+		worldResults = nil
+
+		return results
+	end
+end
+
+function World:QueryBodiesInSphere(position, radius, filter, firstOnly)
+	if firstOnly then
+		local collider = self._PhysicsWorld:querySphere(
+			position.X, position.Y, position.Z,
+			radius,
+			filter 
+		)
+
+		return {collider:getUserData()}
+	else
+		worldResults = results
+
+		self._PhysicsWorld:querySphere(
+			position.X, position.Y, position.Z,
+			radius,
+			filter,
+			QueryBodiesInShapeCallback
+		)
+
+		local results = worldResults
+		worldResults = nil
+
+		return results
+	end
+end
+
 function World:GetCamera()
 	return self._Camera
 end
@@ -259,6 +421,10 @@ function World:SetSkybox(skybox)
 
 		return true, skybox
 	end
+end
+
+function World:GetPhysicsWorld()
+	return self._PhysicsWorld
 end
 
 function World:GetGravity()
@@ -302,8 +468,7 @@ function World:Destroy()
 		self._PhysicsWorld = nil
 
 		self._Gravity = nil
-
-		table.erase(self._Lights)
+		
 		self._Lights = nil
 
 		self._LightBuffer:release()

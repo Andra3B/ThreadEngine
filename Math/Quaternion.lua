@@ -72,7 +72,15 @@ function Quaternion.CreateLookAlong(forward, up)
 	return Quaternion.Create(w, x, y, z)
 end
 
-function Quaternion.CreateAxisRotation(angle, axis)
+function Quaternion.CreateAxisRotation(angle, axisX, axisY, axisZ)
+	local axis = nil
+
+	if type(axisX) == "number" then
+		axis = Vector3.Create(axisX, axisY, axisZ)
+	else
+		axis = axisX
+	end
+
 	if angle == 0 then
 		return Quaternion.One
 	else
@@ -85,6 +93,21 @@ function Quaternion.CreateAxisRotation(angle, axis)
 			axis.Y * factor,
 			axis.Z * factor
 		)
+	end
+end
+
+function Quaternion:GetAngleAxis(unpacked)
+	local halfAngle = math.acos(self.W)
+	local inverseFactor = 1 / math.sin(halfAngle)
+
+	local axisX = self.X * inverseFactor
+	local axisY = self.Y * inverseFactor
+	local axisZ = self.Z * inverseFactor
+
+	if unpacked then
+		return halfAngle * 2, x, y, z
+	else
+		return halfAngle * 2, Vector3.Create(axisX, axisY, axisZ)
 	end
 end
 
