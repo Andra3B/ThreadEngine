@@ -4,11 +4,7 @@ local worldResults = nil
 local worldResultsCount = nil
 
 local function OnDescendantAdded(world, descendant)
-	if Class.IsA(descendant, "Body") then
-		if descendant.Collider then
-			descendant.Collider:Refresh()
-		end
-	elseif Class.IsA(descendant, "Light") then
+	if Class.IsA(descendant, "Light") then
 		local lightIndex = #world._Lights + 1
 
 		if lightIndex <= 32 then
@@ -21,11 +17,7 @@ local function OnDescendantAdded(world, descendant)
 end
 
 local function OnDescendantRemoved(world, descendant)
-	if Class.IsA(descendant, "Body") then
-		if descendant.Collider then
-			descendant.Collider:Refresh()
-		end
-	elseif Class.IsA(descendant, "Light") then
+	if Class.IsA(descendant, "Light") then
 		local lightIndex = descendant._LightIndex
 
 		if lightIndex ~= 0 then
@@ -57,16 +49,19 @@ local function OnCollisionFinished(colliderOne, colliderTwo)
 end
 
 function World.Create(tags)
+	tags = tags or table.empty
+
 	local self = Class.CreateInstance(WorldObject.Create(), World)
 
 	self._Camera = Camera.Create()
 
 	self._Skybox = Thread.DefaultSkybox
-
+	
 	self._PhysicsWorld = lovr.physics.newWorld({
 		["tags"] = tags,
-		staticTags = {"Static"}
 	})
+
+	self._CollisionTags = tags
 
 	self._PhysicsWorld:setCallbacks({
 		filter = nil,
@@ -78,7 +73,7 @@ function World.Create(tags)
 	self._Gravity = Vector3.Create(self._PhysicsWorld:getGravity())
 
 	self._TimeSincePhysicsUpdate = 0
-	self._PhysicsUpdatePeriod = 1 / 30
+	self._PhysicsUpdatePeriod = 1 / 60
 
 	self._Lights = table.new(0, 32)
 	self._LightBuffer = lovr.graphics.newBuffer({{
@@ -108,20 +103,25 @@ end
 function World:Update(deltaTime)
 	WorldObject.Update(self, deltaTime)
 
-	self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate + deltaTime
+	-- Delta time clamping to prevent massive physics step sizes
+	self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate + math.min(deltaTime, 0.1)
 
 	for descendant in self:IterateDescendants() do
 		descendant:Update(deltaTime)
 	end
 
 	while self._TimeSincePhysicsUpdate >= self._PhysicsUpdatePeriod do
-		self._PhysicsWorld:update(self._PhysicsUpdatePeriod)
-		
+		if self == Thread.World then
+			Thread.PhysicsUpdate(self._PhysicsUpdatePeriod)
+		end
+
 		for descendant in self:IterateDescendants() do
 			if descendant.PostPhysicsUpdate then
-				descendant:PhysicsUpdate(self._TimeSincePhysicsUpdate)
+				descendant:PhysicsUpdate(self._PhysicsUpdatePeriod)
 			end
 		end
+
+		self._PhysicsWorld:update(self._PhysicsUpdatePeriod)
 
 		self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate - self._PhysicsUpdatePeriod
 	end
@@ -167,6 +167,22 @@ function World:Draw(pass)
 				pass:pop("state")
 			end
 		end
+	end
+end
+
+function World:GetCollisionTags()
+	return self._CollisionTags
+end
+
+function World:GetCollisionBetweenTags(tagOne, tagTwo)
+	return self._PhysicsWorld:isCollisionEnabledBetween(tagOne, tagTwo)
+end
+
+function World:SetCollisionBetweenTags(tagOne, tagTwo, collide)
+	if collide then
+		self._PhysicsWorld:enableCollisionBetween(tagOne, tagTwo)
+	else
+		self._PhysicsWorld:disableCollisionBetween(tagOne, tagTwo)
 	end
 end
 
@@ -437,6 +453,8 @@ end
 
 function World:SetGravity(gravity)
 	if gravity ~= self._Gravity then
+		self._PhysicsWorld:setGravity(gravity:Unpack())
+
 		self._Gravity = gravity
 
 		return true, gravity
@@ -470,6 +488,8 @@ function World:Destroy()
 		self._PhysicsWorld:destroy()
 		self._PhysicsWorld:release()
 		self._PhysicsWorld = nil
+
+		self._CollisionTags = nil
 
 		self._Gravity = nil
 		

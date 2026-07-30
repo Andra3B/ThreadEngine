@@ -1,35 +1,38 @@
 require("init")
 
-local fpsLabel = nil
-local cube = nil
-
 function Thread.Load()
-	fps = Label.Create()
-
+	local fps = Label.Create()
+	fps.Name = "FPS"
 	fps.Size = ScaleOffset2.Create(0, 0, 150, 50)
 	fps.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
 	fps.VerticalTextAlignment = Enum.VerticalAlignment.Middle
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
-
-	local floorCollider = BoxCollider.Create()
-	floorCollider.Size = Vector3.Create(20, 1, 20)
-
-	local cubeCollider = BoxCollider.Create()
-	cubeCollider.Size = Vector3.One
+	
+	local button = Button.Create()
+	button.Origin = ScaleOffset2.Create(0.5, 0.5, 0, 0)
+	button.Size = ScaleOffset2.Create(0.8, 0.2, 0, 0)
+	button.Position = ScaleOffset2.Create(0.5, 0.5, 0, 0)
+	button.Text = "Print Hi"
+	button.HorizontalTextAlignment = Enum.HorizontalAlignment.Middle
+	button.VerticalTextAlignment = Enum.VerticalAlignment.Middle
+	button.Events:Listen("PressedChanged", function(source, pressed)
+		if pressed then
+			print("Hello, world!")
+		end
+	end)
 
 	local floor = Body.Create()
-	cube = Body.Create()
-
 	floor.Mesh = Thread.Meshes.Cube
-	floor.Collider = floorCollider
-
-	cube.Mesh = Thread.Meshes.Cube
-	cube.Collider = cubeCollider
-
+	floor.Material = Thread.Materials.Green
+	floor:AddColliderShape(lovr.physics.newBoxShape(20, 1, 20))
+	floor.Kinematic = true
 	floor.Scale = Vector3.Create(20, 1, 20)
-
 	floor.Position = Vector3.Create(0, -0.5, 0)
+
+	local cube = Body.Create()
+	cube.Mesh = Thread.Meshes.Cube
+	cube:AddColliderShape(lovr.physics.newBoxShape(1, 1, 1))
 	cube.Position = Vector3.Create(0, 2, 0)
 
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
@@ -41,14 +44,16 @@ function Thread.Load()
 	cameraMovement:SetMapping(Enum.Input.Q, Vector3.Down)
 
 	cameraRotate = Input.Create("CameraRotate", Enum.InputPriority.Lowest)
-	cameraRotate:SetMapping(Enum.Input.LeftAlt)
+	cameraRotate:SetMapping(Enum.Input.RightMouseButton)
 	cameraRotate:SetMapping(Enum.Input.MouseMovement)
 
 	cameraAngles = Vector3.Zero
 	
-	Thread.World.Camera.Position = Vector3.Create(0, 1, -2)
+	Thread.World.Camera.Position = Vector3.Create(0, 1, 2)
 
 	fps.Parent = Thread.Interface
+	button.Parent = Thread.Interface
+
 	floor.Parent = Thread.World
 	cube.Parent = Thread.World
 end
@@ -75,6 +80,10 @@ function Thread.Update(deltaTime)
 	end
 	
 	camera.Orientation = Quaternion.CreateYXZRotation(cameraAngles)
+	
+	Thread.Interface:GetDescendantWithName("FPS").Text = string.format("FPS: %d", lovr.timer:getFPS())
+end
 
-	fps.Text = string.format("FPS: %d", lovr.timer:getFPS())
+function Thread.PhysicsUpdate(deltaTime)
+	
 end

@@ -3,7 +3,7 @@ local Material = {}
 function Material.Create()
 	local self = Class.CreateInstance(Object.Create(), Material)
 
-	self._Colour = Vector4.Create(0.3, 0.3, 0.3, 1.0)
+	self._Colour = Vector4.Create(0.2, 0.2, 0.2, 1.0)
 	self._ColourTexture = nil
 
 	self._Glow = Vector4.Create(0, 0, 0, 0)

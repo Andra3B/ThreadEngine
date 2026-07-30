@@ -105,20 +105,11 @@ Material = require("World.Material")
 Light = require("World.Lights.Light")
 PointLight = require("World.Lights.PointLight")
 
-Collider = require("World.Colliders.Collider")
-BoxCollider = require("World.Colliders.BoxCollider")
-CapsuleCollider = require("World.Colliders.CapsuleCollider")
-CompoundCollider = require("World.Colliders.CompoundCollider")
-ConvexCollider = require("World.Colliders.ConvexCollider")
-CylinderCollider = require("World.Colliders.CylinderCollider")
-MeshCollider = require("World.Colliders.MeshCollider")
-SphereCollider = require("World.Colliders.SphereCollider")
-TerrainCollider = require("World.Colliders.TerrainCollider")
-
 InterfaceObject = require("Interface.InterfaceObject")
 Interface = require("Interface.Interface")
 Frame = require("Interface.Frame")
 Label = require("Interface.Label")
+Button = require("Interface.Button")
 
 local MOUSE_INPUTS = {
 	"m_leftmousebutton",
@@ -143,13 +134,15 @@ Thread = {}
 
 Thread._SkyboxBlockHarmonicsBuffer = nil
 
+Thread.InterfaceInputs = {}
+
 Thread.Shaders = {}
 Thread.Meshes = {}
+Thread.Materials = {}
 
 Thread.LovrMatrixIdentity = nil
 Thread.CubemapMatrices = table.new(0, 7)
 
-Thread.DefaultMaterial = nil
 Thread.DefaultSkybox = nil
 
 Thread.WhiteTexture = nil
@@ -188,14 +181,14 @@ local function ThreadQuit(exitCode)
 	Thread.DefaultSkybox:Destroy()
 	Thread.DefaultSkybox = nil
 
-	Thread.DefaultMaterial:Destroy()
-	Thread.DefaultMaterial = nil
-
 	table.erase(Thread.CubemapMatrices)
 	Thread.LovrMatrixIdentity = nil
 
+	table.erase(Thread.Materials, Material.Destroy)
 	table.erase(Thread.Meshes, Mesh.Destroy)
 	table.erase(Thread.Shaders, LovrResourceRelease)
+
+	table.erase(Thread.InterfaceInputs, Input.Destroy)
 
 	Thread._SkyboxBlockHarmonicsBuffer:release()
 	Thread._SkyboxBlockHarmonicsBuffer = nil
@@ -203,6 +196,7 @@ end
 
 function Thread.Load() end
 function Thread.Update(deltaTime) end
+function Thread.PhysicsUpdate(deltaTime) end
 function Thread.Quit(exitCode) end
 function Thread.Restart() end
 
@@ -296,6 +290,10 @@ end
 
 function lovr.run()
 	Thread._SkyboxBlockHarmonicsBuffer = lovr.graphics.newBuffer({"vec3", layout = "std430"}, 221184)
+
+	Thread.InterfaceInputs.Click = Input.Create("InterfaceClick")
+	Thread.InterfaceInputs.Click:SetMapping(Enum.Input.LeftMouseButton)
+	Thread.InterfaceInputs.Click:SetMapping(Enum.Input.MouseMovement)
 
 	Thread.Shaders.Interface = lovr.graphics.newShader(
 		"Assets/Shaders/Interface/Interface.vert", "Assets/Shaders/Interface/Interface.frag"
@@ -445,6 +443,17 @@ function lovr.run()
 	
 	Thread.Meshes.Cube = Mesh.Create(cube)
 
+	Thread.Materials.Default = Material.Create()
+
+	Thread.Materials.Red = Material.Create()
+	Thread.Materials.Red.Colour = Vector4.Create(0.2, 0, 0, 1)
+
+	Thread.Materials.Green = Material.Create()
+	Thread.Materials.Green.Colour = Vector4.Create(0, 0.2, 0, 1)
+
+	Thread.Materials.Blue = Material.Create()
+	Thread.Materials.Blue.Colour = Vector4.Create(0, 0, 0.2, 1)
+
 	Thread.LovrMatrixIdentity = lovr.math.newMat4()
 
 	Thread.CubemapMatrices[1] = lovr.math.newMat4(Matrix4.CreatePerspectiveProjection(1, math.rad(90), 0.1, 1):Unpack())
@@ -455,8 +464,7 @@ function lovr.run()
 	Thread.CubemapMatrices[6] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(0), 0)):Unpack())	-- +Z
 	Thread.CubemapMatrices[7] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(180), 0)):Unpack())	-- -Z
 
-	Thread.DefaultMaterial = Material.Create()
-	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/Studio.hdr")
+	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
 
 	local image = lovr.data.newImage(1, 1, "rgba8")
 	image:setPixel(0, 0, 1, 1, 1, 1)

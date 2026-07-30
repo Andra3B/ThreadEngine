@@ -6,7 +6,7 @@ function Camera.Create()
 	self._FieldOfView = math.rad(90)
 
 	self._Near = 0.1
-	self._Far = 10
+	self._Far = 100
 
 	self._Projection = Class.NIL
 

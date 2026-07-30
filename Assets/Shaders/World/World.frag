@@ -96,9 +96,6 @@ vec3 GetDirectLighting(const Surface surface, vec3 direction, vec4 color, float 
 	float NoH = clamp(dot(N, H), 0.0, 1.0);
 	float VoH = clamp(dot(V, H), 0.0, 1.0);
 
-	// Diffuse
-	vec3 diffuse = surface.diffuse / PI;
-
 	// Specular
 	float D = D_GGX(surface, NoH);
 	float G = G_SmithGGXCorrelated(surface, NoV, NoL);
@@ -106,25 +103,31 @@ vec3 GetDirectLighting(const Surface surface, vec3 direction, vec4 color, float 
 
 	vec3 specular = (D * G * F) / max(4.0 * NoV * NoL, 1e-4);
 
+	vec3 kD = (1.0 - F) * (1.0 - surface.metalness);
+
+	// Diffuse
+	vec3 diffuse = (kD * surface.diffuse) / PI;
+
 	return (diffuse + specular) * color.rgb * (NoL * color.a * visibility);
 }
 
 vec3 GetIndirectLighting(const Surface surface, textureCube skybox, in vec3 sphericalHarmonics[9]) {
 	float NoV = clamp(dot(surface.normal, surface.view), 0.0, 1.0);
 
+	vec3 F = F_SchlickRoughness(surface, NoV);
 	vec3 irradiance = evaluateSphericalHarmonics(sphericalHarmonics, surface.normal);
-	vec3 kD = (1.0 - F_SchlickRoughness(surface, NoV)) * (1.0 - surface.metalness);
+	vec3 kD = (1.0 - F) * (1.0 - surface.metalness);
 
-	vec3 diffuse = irradiance * (surface.diffuse / PI) * kD * surface.occlusion;
+	vec3 diffuse = (irradiance * kD * surface.diffuse) / PI;
 
 	vec2 brdf = prefilteredBRDF(NoV, surface.roughness);
 
 	int mipmapCount = textureQueryLevels(samplerCube(skybox, Sampler));
-	vec3 prefilteredBRDF = textureLod(samplerCube(skybox, Sampler), surface.reflection, surface.roughness * (mipmapCount - 1)).rgb;
+	vec3 prefilteredColour = textureLod(samplerCube(skybox, Sampler), surface.reflection, surface.roughness * (mipmapCount - 1)).rgb;
 
-	vec3 specular = prefilteredBRDF * (surface.f0 * brdf.r + brdf.g);
+	vec3 specular = prefilteredColour * (F * brdf.r + brdf.g);
 
-	return diffuse + specular;
+	return (diffuse + specular) * surface.occlusion;
 }
 
 vec4 lovrmain() {
@@ -181,12 +184,12 @@ vec4 lovrmain() {
 			colour += GetDirectLighting(surface, L, vec4(irradiance, 1.0), 1.0);
 		}
 	}
-	
+
 	vec4 finalColour = vec4(colour + surface.emissive, surface.baseColor.a);
-	
-	if (finalColour.a < ObjectMaterial.AlphaCutoff) {
+
+	if (surface.baseColor.a < ObjectMaterial.AlphaCutoff) {
 		discard;
-	}	
+	}
 
 	return finalColour;
 }

@@ -98,14 +98,14 @@ end
 
 function Quaternion:GetAngleAxis(unpacked)
 	local halfAngle = math.acos(self.W)
-	local inverseFactor = 1 / math.sin(halfAngle)
+	local inverseFactor = halfAngle == 0 and 0 or (1 / math.sin(halfAngle))
 
 	local axisX = self.X * inverseFactor
 	local axisY = self.Y * inverseFactor
 	local axisZ = self.Z * inverseFactor
 
 	if unpacked then
-		return halfAngle * 2, x, y, z
+		return halfAngle * 2, axisX, axisY, axisZ
 	else
 		return halfAngle * 2, Vector3.Create(axisX, axisY, axisZ)
 	end
@@ -254,6 +254,13 @@ function Quaternion.__unm(quaternion)
 	local w, x, y, z = quaternion:Unpack()
 
 	return Quaternion.Create(-w, -x, -y, -z)
+end
+
+function Quaternion.__eq(leftQuaternion, rightQuaternion)
+	local leftW, leftX, leftY, leftZ = leftQuaternion:Unpack()
+	local rightW, rightX, rightY, rightZ = rightQuaternion:Unpack()
+
+	return leftW == rightW and leftX == rightX and leftY == rightY and leftZ == rightZ
 end
 
 function Quaternion.__tostring(quaternion)
