@@ -1,5 +1,4 @@
 uniform mat4 InverseTransform;
-
 uniform vec2 Size;
 uniform vec4 CornerRadius;
 uniform float BorderSize;
@@ -20,9 +19,17 @@ vec4 lovrmain() {
 	vec4 colour = Color;
 
 	if (BorderSize > 0.0 || dot(CornerRadius, CornerRadius) > 0.0) {
-		float distance = RoundedRectangleSDF((InverseTransform * vec4(FragCoord.xy, 0.0, 1.0)).xy, Size * 0.5, CornerRadius);
+		float distance = RoundedRectangleSDF(
+			(InverseTransform * vec4(FragCoord.xy, 0.0, 1.0)).xy,
+			Size * 0.5,
+			CornerRadius
+		);
 
-		colour = mix(colour, BorderColour, step(0.0, distance)) * (1.0 - step(BorderSize, distance));
+		if (distance < BorderSize) {
+			colour = mix(colour, BorderColour, step(0.0, distance));
+		} else {
+			discard;
+		}
 	}
 
 	return colour;

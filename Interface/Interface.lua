@@ -1,6 +1,6 @@
 local Interface = {}
 
-local function OnInterfaceClick(interface, input)
+local function OnInterfaceInteract(interface, input)
 	local object = interface:GetObjectContainingPoint(
 		Vector2.Create(lovr.system.getMousePosition()),
 		"Interactive"
@@ -18,6 +18,26 @@ local function OnInterfaceClick(interface, input)
 	end
 end
 
+local function OnInterfaceScroll(interface, input)
+	if interface._Hovering then
+		local scrollFrame = Class.IsA(interface._Hovering, "ScrollFrame") and interface._Hovering or interface._Hovering:GetAncestorWithType("ScrollFrame")
+
+		if scrollFrame then
+			if input.Direction.Z < 0 then
+				scrollFrame:Scroll(Vector2.Create(
+					input.Direction.Y * 15,
+					0
+				))
+			else
+				scrollFrame:Scroll(Vector2.Create(
+					0,
+					input.Direction.Y * 15
+				))
+			end
+		end
+	end
+end
+
 function Interface.Create()
 	local self = Class.CreateInstance(InterfaceObject.Create(), Interface)
 	
@@ -27,13 +47,14 @@ function Interface.Create()
 
 	self._Projection = Matrix4.Zero
 
-	self._InterfaceClickListener = Thread.InterfaceInputs.Click.Events:Listen("InputChanged", OnInterfaceClick, self)
+	self._InterfaceSelectListener = Thread.Keybinds.Interface.Select.Events:Listen("InputChanged", OnInterfaceInteract, self)
+	self._InterfaceScrollListener = Thread.Keybinds.Interface.Scroll.Events:Listen("InputChanged", OnInterfaceScroll, self)
 
 	return self
 end
 
 function Interface:GetObjectContainingPoint(point, objectType)
-	local drawOrder = self:GetDrawOrder(self)
+	local drawOrder = self:GetDrawOrder()
 
 	for index = #drawOrder, 1, -1 do
 		local object = drawOrder[index]
@@ -51,6 +72,57 @@ function Interface:GetObjectContainingPoint(point, objectType)
 	end
 end
 
+function Interface:Update(deltaTime)
+	InterfaceObject.Update(self, deltaTime)
+
+	for descendant in self:IterateDescendants() do
+		descendant:Update(deltaTime)
+	end
+end
+
+local function Draw(pass, object, clipDepth)
+	if Class.IsA(object, "Frame") then
+		if not object.ChildOverflow then
+			pass:push("state")
+			
+			pass:setStencilTest("equal", clipDepth)
+			pass:setStencilWrite("increment")
+			pass:setColorWrite(false)
+			
+			object:Draw(pass, true)
+			
+			pass:pop("state")
+			
+			clipDepth = clipDepth + 1
+		end
+		
+		pass:push("state")
+		
+		pass:setStencilTest("equal", clipDepth)
+		pass:setStencilWrite()
+
+		object:Draw(pass, false)
+
+		pass:pop("state")
+
+		for _, child in ipairs(object:GetChildrenDrawOrder()) do
+			Draw(pass, child, clipDepth)
+		end
+
+		if not object.ChildOverflow then
+			pass:push("state")
+			
+			pass:setStencilTest("equal", clipDepth)
+			pass:setStencilWrite("decrement")
+			pass:setColorWrite(false)
+
+			object:Draw(pass, true)
+
+			pass:pop("state")
+		end
+	end
+end
+
 function Interface:Draw(pass)
 	pass:setShader(Thread.Shaders.Interface)
 	pass:setProjection("matrix", self._Projection:Unpack())
@@ -60,11 +132,9 @@ function Interface:Draw(pass)
 
 	pass:setDepthTest("none")
 	pass:setDepthWrite(false)
-
-	for _, child in ipairs(self:GetDrawOrder()) do
-		pass:push("state")
-		child:Draw(pass)
-		pass:pop("state")
+	
+	for _, child in ipairs(self:GetChildrenDrawOrder()) do
+		Draw(pass, child, 0)
 	end
 end
 
@@ -148,8 +218,11 @@ function Interface:Destroy()
 
 		self._Projection = nil
 
-		self._InterfaceClickListener:Destroy()
-		self._InterfaceClickListener = nil
+		self._InterfaceSelectListener:Destroy()
+		self._InterfaceSelectListener = nil
+
+		self._InterfaceScrollListener:Destroy()
+		self._InterfaceScrollListener = nil
 
 		InterfaceObject.Destroy(self)
 	end

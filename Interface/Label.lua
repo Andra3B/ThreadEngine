@@ -37,11 +37,10 @@ function Label.Create()
     return self
 end
 
-function Label:Draw(pass)
-    Frame.Draw(self, pass)
+function Label:Draw(pass, stencil)
+    Frame.Draw(self, pass, stencil)
 
-	if #self.DisplayedText > 0 then
-		pass:push("state")
+	if not stencil and #self.DisplayedText > 0 then
 		pass:setShader()
 
 		self._Font:setPixelDensity(1)
@@ -58,8 +57,6 @@ function Label:Draw(pass)
 			self._HorizontalTextAlignment,
 			self._VerticalTextAlignment
 		)
-
-		pass:pop("state")
 	end
 end
 

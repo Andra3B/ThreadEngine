@@ -12,21 +12,26 @@ function Frame.Create()
 
     self._BackgroundColour = Vector4.White
 
+	self._ChildOverflow = true
+
 	self._Visible = true
 
     return self
 end
 
-function Frame:Draw(pass)
+function Frame:Draw(pass, stencil)
     pass:send("InverseTransform", self.InverseTransform.Components)
-
     pass:send("Size", {self.AbsoluteSize:Unpack()})
-
     pass:send("CornerRadius", {self.AbsoluteCornerRadius:Unpack()})
-    pass:send("BorderSize", self._BorderSize)
-    pass:send("BorderColour", {self.BorderColour:Unpack()})
 
-	pass:setColor(self.BackgroundColour:Unpack())
+	if stencil then
+		pass:send("BorderSize", 0)
+	else
+		pass:send("BorderSize", self._BorderSize)
+		pass:send("BorderColour", {self.BorderColour:Unpack()})
+
+		pass:setColor(self.BackgroundColour:Unpack())
+	end
 
     pass:draw(Thread.Meshes.Square.Mesh, self.LovrTransform, 1)
 end
@@ -101,6 +106,18 @@ function Frame:SetBackgroundColour(colour)
 
         return true, colour
     end
+end
+
+function Frame:GetChildOverflow()
+	return self._ChildOverflow
+end
+
+function Frame:SetChildOverflow(overflow)
+	if overflow ~= self._ChildOverflow then
+		self._ChildOverflow = overflow
+
+		return true, overflow
+	end
 end
 
 function Frame:IsVisible()

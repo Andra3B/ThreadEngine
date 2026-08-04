@@ -58,16 +58,12 @@ function Hierarchy:GetParent()
 	return self._Parent
 end
 
-local function AncestorIterator(parent)
-	while parent do
-		coroutine.yield(parent)
-
-		parent = parent.Parent
-	end
+local function AncestorIterator(_, parent)
+	return parent and parent._Parent
 end
 
 function Hierarchy:IterateAncestors()
-	return coroutine.wrap(AncestorIterator), self.Parent, nil
+	return AncestorIterator, nil, self
 end
 
 function Hierarchy:GetAncestorWithName(name)

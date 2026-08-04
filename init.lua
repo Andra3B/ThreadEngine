@@ -83,6 +83,8 @@ EventListener = require("EventListener")
 Vector2 = require("Math.Vector2")
 Vector3 = require("Math.Vector3")
 Vector4 = require("Math.Vector4")
+Extents2 = require("Math.Extents2")
+Extents3 = require("Math.Extents3")
 ScaleOffset = require("Math.ScaleOffset")
 ScaleOffset2 = require("Math.ScaleOffset2")
 ScaleOffset3 = require("Math.ScaleOffset3")
@@ -110,6 +112,7 @@ Interface = require("Interface.Interface")
 Frame = require("Interface.Frame")
 Label = require("Interface.Label")
 Button = require("Interface.Button")
+ScrollFrame = require("Interface.ScrollFrame")
 
 local MOUSE_INPUTS = {
 	"m_leftmousebutton",
@@ -134,8 +137,6 @@ Thread = {}
 
 Thread._SkyboxBlockHarmonicsBuffer = nil
 
-Thread.InterfaceInputs = {}
-
 Thread.Shaders = {}
 Thread.Meshes = {}
 Thread.Materials = {}
@@ -149,6 +150,10 @@ Thread.WhiteTexture = nil
 Thread.BlackTexture = nil
 
 Thread.Events = nil
+
+Thread.Keybinds = {
+	Interface = {}
+}
 
 Thread.World = nil
 Thread.Interface = nil
@@ -165,9 +170,11 @@ local function ThreadQuit(exitCode)
 
 	Thread.Interface:Destroy()
 	Thread.Interface = nil
-
+	
 	Thread.World:Destroy()
 	Thread.World = nil
+
+	table.erase(Thread.Keybinds, Input.Destroy, true)
 
 	Thread.Events:Destroy()
 	Thread.Events = nil
@@ -187,8 +194,6 @@ local function ThreadQuit(exitCode)
 	table.erase(Thread.Materials, Material.Destroy)
 	table.erase(Thread.Meshes, Mesh.Destroy)
 	table.erase(Thread.Shaders, LovrResourceRelease)
-
-	table.erase(Thread.InterfaceInputs, Input.Destroy)
 
 	Thread._SkyboxBlockHarmonicsBuffer:release()
 	Thread._SkyboxBlockHarmonicsBuffer = nil
@@ -290,10 +295,6 @@ end
 
 function lovr.run()
 	Thread._SkyboxBlockHarmonicsBuffer = lovr.graphics.newBuffer({"vec3", layout = "std430"}, 221184)
-
-	Thread.InterfaceInputs.Click = Input.Create("InterfaceClick")
-	Thread.InterfaceInputs.Click:SetMapping(Enum.Input.LeftMouseButton)
-	Thread.InterfaceInputs.Click:SetMapping(Enum.Input.MouseMovement)
 
 	Thread.Shaders.Interface = lovr.graphics.newShader(
 		"Assets/Shaders/Interface/Interface.vert", "Assets/Shaders/Interface/Interface.frag"
@@ -490,6 +491,14 @@ function lovr.run()
 	image:release()
 
 	Thread.Events = EventDirector.Create(Thread)
+
+	Thread.Keybinds.Interface.Select = Input.Create("InterfaceSelect")
+	Thread.Keybinds.Interface.Select:SetMapping(Enum.Input.LeftMouseButton)
+	Thread.Keybinds.Interface.Select:SetMapping(Enum.Input.MouseMovement)
+
+	Thread.Keybinds.Interface.Scroll = Input.Create("InterfaceScroll")
+	Thread.Keybinds.Interface.Scroll:SetMapping(Enum.Input.MouseWheelMovement)
+	Thread.Keybinds.Interface.Scroll:SetMapping(Enum.Input.LeftControl)
 
 	Thread.World = World.Create()
 	Thread.Interface = Interface.Create()
