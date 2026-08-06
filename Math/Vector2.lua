@@ -10,7 +10,6 @@ function Vector2.Create(x, y)
 end
 
 function Vector2:Rotate(angle)
-	angle = math.abs(angle) == math.huge and 0 or angle
 	local sine, cos = math.sin(angle), math.cos(angle)
 
 	return Vector2.Create(
@@ -19,17 +18,17 @@ function Vector2:Rotate(angle)
 	)
 end
 
-function Vector2:Lerp(otherVector, parameter)
+function Vector2:Lerp(to, alpha)
 	return Vector2.Create(
-		self.X + parameter * (otherVector.X - self.X),
-		self.Y + parameter * (otherVector.Y - self.Y)
+		self.X + alpha * (to.X - self.X),
+		self.Y + alpha * (to.Y - self.Y)
 	)
 end
 
-function Vector2:Dot(otherVector)
+function Vector2:Dot(other)
 	return
-		self.X * otherVector.X +
-		self.Y * otherVector.Y
+		self.X * other.X +
+		self.Y * other.Y
 end
 
 function Vector2:GetSquaredMagnitude()
@@ -53,15 +52,15 @@ function Vector2:Unpack()
 	return self.X, self.Y
 end
 
-function Vector2.__add(leftVector, rightVector)
-	local leftX, leftY = leftVector:Unpack()
+function Vector2.__add(left, right)
+	local leftX, leftY = left:Unpack()
 	local rightX, rightY
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
 	else
-		rightX, rightY = rightVector:Unpack()
+		rightX, rightY = right:Unpack()
 	end
 
 	return Vector2.Create(
@@ -70,15 +69,15 @@ function Vector2.__add(leftVector, rightVector)
 	)
 end
 
-function Vector2.__sub(leftVector, rightVector)
-	local leftX, leftY = leftVector:Unpack()
+function Vector2.__sub(left, right)
+	local leftX, leftY = left:Unpack()
 	local rightX, rightY
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
 	else
-		rightX, rightY = rightVector:Unpack()
+		rightX, rightY = right:Unpack()
 	end
 
 	return Vector2.Create(
@@ -87,15 +86,15 @@ function Vector2.__sub(leftVector, rightVector)
 	)
 end
 
-function Vector2.__mul(leftVector, rightVector)
-	local leftX, leftY = leftVector:Unpack()
+function Vector2.__mul(left, right)
+	local leftX, leftY = left:Unpack()
 	local rightX, rightY
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
 	else
-		rightX, rightY = rightVector:Unpack()
+		rightX, rightY = right:Unpack()
 	end
 
 	return Vector2.Create(
@@ -104,15 +103,15 @@ function Vector2.__mul(leftVector, rightVector)
 	)
 end
 
-function Vector2.__div(leftVector, rightVector)
-	local leftX, leftY = leftVector:Unpack()
+function Vector2.__div(left, right)
+	local leftX, leftY = left:Unpack()
 	local rightX, rightY
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
 	else
-		rightX, rightY = rightVector:Unpack()
+		rightX, rightY = right:Unpack()
 	end
 
 	return Vector2.Create(
@@ -127,9 +126,9 @@ function Vector2.__unm(vector)
 	return Vector2.Create(-x, -y)
 end
 
-function Vector2.__eq(leftVector, rightVector)
-	local leftX, leftY = leftVector:Unpack()
-	local rightX, rightY = rightVector:Unpack()
+function Vector2.__eq(left, right)
+	local leftX, leftY = left:Unpack()
+	local rightX, rightY = right:Unpack()
 
 	return leftX == rightX and leftY == rightY
 end

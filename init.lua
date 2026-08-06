@@ -60,7 +60,9 @@ scriptpath = function()
 	return debug.getinfo(2, "S").short_src
 end
 
-table.new = require("table.new")
+require("table.new")
+require("table.clear")
+
 table.empty = table.new(0, 0)
 
 bit = require("bit")
@@ -106,6 +108,10 @@ Material = require("World.Material")
 
 Light = require("World.Lights.Light")
 PointLight = require("World.Lights.PointLight")
+
+Animation = require("Animation.Animation")
+AnimationChannel = require("Animation.AnimationChannel")
+Animator = require("Animation.Animator")
 
 InterfaceObject = require("Interface.InterfaceObject")
 Interface = require("Interface.Interface")
@@ -465,7 +471,7 @@ function lovr.run()
 	Thread.CubemapMatrices[6] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(0), 0)):Unpack())	-- +Z
 	Thread.CubemapMatrices[7] = lovr.math.newMat4(Matrix4.CreateTransform(Vector3.Zero, Vector3.Create(0, math.rad(180), 0)):Unpack())	-- -Z
 
-	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/CloudySky.hdr")
+	Thread.DefaultSkybox = Skybox.Create("Assets/Skyboxes/ClearNight.hdr")
 
 	local image = lovr.data.newImage(1, 1, "rgba8")
 	image:setPixel(0, 0, 1, 1, 1, 1)

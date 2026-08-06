@@ -9,38 +9,9 @@ function Thread.Load()
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
 
-	root = Frame.Create()
-	root.Name = "Root"
-	root.Origin = ScaleOffset2.Create(0.5, 0.5, 0, 0)
-	root.Size = ScaleOffset2.Create(0.8, 0.8, 0, 0)
-	root.Position = ScaleOffset2.Create(0.5, 0.5, 0, 0)
-	root.CornerRadius = ScaleOffset4.Create(0.1, 0.1, 0.1, 0.1, 0, 0, 0, 0)
-	root.ChildOverflow = false
-
-	local subframe1 = Frame.Create()
-	subframe1.Name = "Subframe1"
-	subframe1.Size = ScaleOffset2.Create(0.8, 0.5, 0, 0)
-	subframe1.BackgroundColour = Vector4.Green
-	subframe1.ChildOverflow = false
-
-	local label1 = Label.Create()
-	label1.Name = "Label1"
-	label1.Size = ScaleOffset2.Create(1.5, 0.5, 0, 0)
-	label1.Text = "Hello, everyone! This is the LONGEST TEXT EVER! I was inspired by the various other \"longest texts ever\" on the internet, and I wanted to make my own."
-	label1.BackgroundColour = Vector4.Red
-
-	local subframe2 = Frame.Create()
-	subframe2.Name = "Subframe2"
-	subframe2.Size = ScaleOffset2.Create(0.3, 0.3, 0, 0)
-	subframe2.Position = ScaleOffset2.Create(0, 0.6, 0, 0)
-	subframe2.BackgroundColour = Vector4.Black
-	subframe2.ChildOverflow = true
-
-	local label2 = Label.Create()
-	label2.Name = "Label2"
-	label2.Size = ScaleOffset2.Create(1.5, 0.5, 0, 0)
-	label2.Text = "Hello, everyone! I am Josh and this is some really really really long text that I have typed out for you and everybody else!"
-	label2.BackgroundColour = Vector4.Blue
+	animatedBox = Model.Create("Assets/Models/BoxAnimated.glb")
+	animator = Animator.Create()
+	animator.Parent = animatedBox
 
 	local floor = Body.Create()
 	floor.Mesh = Thread.Meshes.Cube
@@ -49,11 +20,6 @@ function Thread.Load()
 	floor.Kinematic = true
 	floor.Scale = Vector3.Create(20, 1, 20)
 	floor.Position = Vector3.Create(0, -0.5, 0)
-
-	local cube = Body.Create()
-	cube.Mesh = Thread.Meshes.Cube
-	cube:AddColliderShape(lovr.physics.newBoxShape(1, 1, 1))
-	cube.Position = Vector3.Create(0, 2, 0)
 
 	cameraMovement = Input.Create("CameraMovement", Enum.InputPriority.Lowest)
 	cameraMovement:SetMapping(Enum.Input.W, Vector3.Forward)
@@ -72,19 +38,14 @@ function Thread.Load()
 	Thread.World.Camera.Position = Vector3.Create(0, 1, 2)
 
 	fps.Parent = Thread.Interface
-	root.Parent = Thread.Interface
-	subframe1.Parent = root
-	label1.Parent = subframe1
-	subframe2.Parent = root
-	label2.Parent = subframe2
-
+	animatedBox.Parent = Thread.World
 	floor.Parent = Thread.World
-	cube.Parent = Thread.World
 end
 
 function Thread.Update(deltaTime)
-	root.Angle = (root.Angle + 0.5 * deltaTime) % (2 * math.pi)
-	print(root.AbsolutePosition)
+	if animator.TimelineDuration == 0 then
+		animator:Play(animatedBox:GetChildWithName("Animation1"))
+	end
 
 	local camera = Thread.World.Camera
 

@@ -61,8 +61,7 @@ function Matrix4.CreateTransform(position, orientation, scale, origin)
 	elseif Class.IsA(orientation, "Vector3") then
 		orientation = Quaternion.CreateYXZRotation(orientation)
 	end
-
-	-- Combined origin offset and scale matrix
+	
 	local result = Matrix4.Create({
 		scale.X, 0, 0, 0,
 		0, scale.Y, 0, 0,
@@ -178,12 +177,12 @@ function Matrix4:Unpack()
 	return unpack(self.Components)
 end
 
-function Matrix4.__mul(leftMatrix, rightMatrix)
-	local left = leftMatrix.Components
+function Matrix4.__mul(left, right)
+	left = left.Components
 
-	local rightMatrixType = Class.GetType(rightMatrix)
-	if rightMatrixType == "Matrix4" then
-		local right = rightMatrix.Components
+	local rightType = Class.GetType(right)
+	if rightType == "Matrix4" then
+		right = right.Components
 
 		return Matrix4.Create({
 			-- Column 1
@@ -210,34 +209,34 @@ function Matrix4.__mul(leftMatrix, rightMatrix)
             left[3]*right[13] + left[7]*right[14] + left[11]*right[15] + left[15]*right[16],
             left[4]*right[13] + left[8]*right[14] + left[12]*right[15] + left[16]*right[16],
 		})
-	elseif rightMatrixType == "Vector3" then
-		x, y, z = rightMatrix:Unpack()
+	elseif rightType == "Vector3" then
+		local x, y, z = right:Unpack()
 
 		return Vector3.Create(
 			left[1]*x + left[5]*y + left[9]*z + left[13],
         	left[2]*x + left[6]*y + left[10]*z + left[14],
         	left[3]*x + left[7]*y + left[11]*z + left[15]
 		)
-	elseif rightMatrixType == "Vector2" then
-		x, y = rightMatrix:Unpack()
+	elseif rightType == "Vector2" then
+		local x, y = right:Unpack()
 
 		return Vector2.Create(
 			left[1]*x + left[5]*y + left[13],
         	left[2]*x + left[6]*y + left[14]
 		)
-	elseif rightMatrixType == "number" then
+	elseif rightType == "number" then
 		return Matrix4.Create({
-			left[1]*rightMatrix, left[2]*rightMatrix, left[3]*rightMatrix, left[4]*rightMatrix,
-			left[5]*rightMatrix, left[6]*rightMatrix, left[7]*rightMatrix, left[8]*rightMatrix,
-			left[9]*rightMatrix, left[10]*rightMatrix, left[11]*rightMatrix, left[12]*rightMatrix,
-			left[13]*rightMatrix, left[14]*rightMatrix, left[15]*rightMatrix, left[16]*rightMatrix,
+			left[1]*right, left[2]*right, left[3]*right, left[4]*right,
+			left[5]*right, left[6]*right, left[7]*right, left[8]*right,
+			left[9]*right, left[10]*right, left[11]*right, left[12]*right,
+			left[13]*right, left[14]*right, left[15]*right, left[16]*right,
 		})
 	end
 end
 
-function Matrix4.__eq(leftMatrix, rightMatrix)
-	local left = leftMatrix.Components
-	local right = rightMatrix.Components
+function Matrix4.__eq(left, right)
+	left = left.Components
+	right = right.Components
 
 	return
 		left[1] == right[1] and left[2] == right[2] and left[3] == right[3] and left[4] == right[4] and
@@ -247,14 +246,14 @@ function Matrix4.__eq(leftMatrix, rightMatrix)
 end
 
 function Matrix4.__tostring(matrix)
-	local components = matrix.Components
+	matrix = matrix.Components
 
 	return string.format(
 		"\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n|%-.3f, %-.3f, %-.3f, %-.3f|\n",
-		components[1], components[5], components[9], components[13],
-		components[2], components[6], components[10], components[14],
-		components[3], components[7], components[11], components[15],
-		components[4], components[8], components[12], components[16]
+		matrix[1], matrix[5], matrix[9], matrix[13],
+		matrix[2], matrix[6], matrix[10], matrix[14],
+		matrix[3], matrix[7], matrix[11], matrix[15],
+		matrix[4], matrix[8], matrix[12], matrix[16]
 	)
 end
 

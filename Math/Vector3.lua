@@ -17,24 +17,24 @@ function Vector3:Rotate(quaternion)
 	return self + (vpCross * w + v:Cross(vpCross)) * 2
 end
 
-function Vector3:Lerp(otherVector, parameter)
+function Vector3:Lerp(other, alpha)
 	return Vector3.Create(
-		self.X + parameter * (otherVector.X - self.X),
-		self.Y + parameter * (otherVector.Y - self.Y),
-		self.Z + parameter * (otherVector.Z - self.Z)
+		self.X + alpha * (other.X - self.X),
+		self.Y + alpha * (other.Y - self.Y),
+		self.Z + alpha * (other.Z - self.Z)
 	)
 end
 
-function Vector3:Dot(otherVector)
+function Vector3:Dot(other)
 	return
-		self.X * otherVector.X +
-		self.Y * otherVector.Y +
-		self.Z * otherVector.Z
+		self.X * other.X +
+		self.Y * other.Y +
+		self.Z * other.Z
 end
 
-function Vector3:Cross(otherVector)
+function Vector3:Cross(other)
 	local selfX, selfY, selfZ = self:Unpack()
-	local x, y, z = otherVector:Unpack()
+	local x, y, z = other:Unpack()
 
 	return Vector3.Create(
 		selfY*z - selfZ*y,
@@ -65,16 +65,16 @@ function Vector3:Unpack()
 	return self.X, self.Y, self.Z
 end
 
-function Vector3.__add(leftVector, rightVector)
-	local leftX, leftY, leftZ = leftVector:Unpack()
+function Vector3.__add(left, right)
+	local leftX, leftY, leftZ = left:Unpack()
 	local rightX, rightY, rightZ
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
-		rightZ = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightX, rightY, rightZ = rightVector:Unpack()
+		rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Vector3.Create(
@@ -84,16 +84,16 @@ function Vector3.__add(leftVector, rightVector)
 	)
 end
 
-function Vector3.__sub(leftVector, rightVector)
-	local leftX, leftY, leftZ = leftVector:Unpack()
+function Vector3.__sub(left, right)
+	local leftX, leftY, leftZ = left:Unpack()
 	local rightX, rightY, rightZ
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
-		rightZ = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightX, rightY, rightZ = rightVector:Unpack()
+		rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Vector3.Create(
@@ -103,16 +103,16 @@ function Vector3.__sub(leftVector, rightVector)
 	)
 end
 
-function Vector3.__mul(leftVector, rightVector)
-	local leftX, leftY, leftZ = leftVector:Unpack()
+function Vector3.__mul(left, right)
+	local leftX, leftY, leftZ = left:Unpack()
 	local rightX, rightY, rightZ
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
-		rightZ = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightX, rightY, rightZ = rightVector:Unpack()
+		rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Vector3.Create(
@@ -122,16 +122,16 @@ function Vector3.__mul(leftVector, rightVector)
 	)
 end
 
-function Vector3.__div(leftVector, rightVector)
-	local leftX, leftY, leftZ = leftVector:Unpack()
+function Vector3.__div(left, right)
+	local leftX, leftY, leftZ = left:Unpack()
 	local rightX, rightY, rightZ
 
-	if type(rightVector) == "number" then
-		rightX = rightVector
-		rightY = rightVector
-		rightZ = rightVector
+	if type(right) == "number" then
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightX, rightY, rightZ = rightVector:Unpack()
+		rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Vector3.Create(
@@ -147,9 +147,9 @@ function Vector3.__unm(vector)
 	return Vector3.Create(-x, -y, -z)
 end
 
-function Vector3.__eq(leftVector, rightVector)
-	local leftX, leftY, leftZ = leftVector:Unpack()
-	local rightX, rightY, rightZ = rightVector:Unpack()
+function Vector3.__eq(left, right)
+	local leftX, leftY, leftZ = left:Unpack()
+	local rightX, rightY, rightZ = right:Unpack()
 
 	return leftX == rightX and leftY == rightY and leftZ == rightZ
 end

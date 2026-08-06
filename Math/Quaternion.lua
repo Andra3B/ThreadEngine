@@ -45,24 +45,28 @@ function Quaternion.CreateLookAlong(forward, up)
 
 	if trace > 0 then
 		local s = math.sqrt(trace + 1.0) * 2
+
 		w = 0.25 * s
 		x = (m21 - m12) / s
 		y = (m02 - m20) / s
     	z = (m10 - m01) / s
 	elseif m00 > m11 and m00 > m22 then
     	local s = math.sqrt(1.0 + m00 - m11 - m22) * 2
+
     	w = (m21 - m12) / s
     	x = 0.25 * s
     	y = (m01 + m10) / s
     	z = (m02 + m20) / s
     elseif m11 > m22 then
 		local s = math.sqrt(1.0 + m11 - m00 - m22) * 2
+
     	w = (m02 - m20) / s
     	x = (m01 + m10) / s
     	y = 0.25 * s
     	z = (m12 + m21) / s
     else
     	local s = math.sqrt(1.0 + m22 - m00 - m11) * 2
+		
     	w = (m10 - m01) / s
     	x = (m02 + m20) / s
     	y = (m12 + m21) / s
@@ -81,11 +85,13 @@ function Quaternion.CreateAxisRotation(angle, axisX, axisY, axisZ)
 		axis = axisX
 	end
 
-	if angle == 0 then
+	local axisMagnitude = axis.Magnitude
+
+	if axisMagnitude == 0 then
 		return Quaternion.One
 	else
 		local halfAngle = angle * 0.5
-		local factor = math.sin(halfAngle) / axis.Magnitude
+		local factor = math.sin(halfAngle) / axisMagnitude
 
 		return Quaternion.Create(
 			math.cos(halfAngle),
@@ -118,12 +124,12 @@ function Quaternion.CreateYXZRotation(angles)
 		Quaternion.CreateAxisRotation(angles.Z, Vector3.Forward)
 end
 
-function Quaternion:Dot(otherQuaternion)
+function Quaternion:Dot(other)
 	return
-		self.W * otherQuaternion.W +
-		self.X * otherQuaternion.X +
-		self.Y * otherQuaternion.Y +
-		self.Z * otherQuaternion.Z
+		self.W * other.W +
+		self.X * other.X +
+		self.Y * other.Y +
+		self.Z * other.Z
 end
 
 function Quaternion:GetSquaredMagnitude()
@@ -138,10 +144,10 @@ function Quaternion:Normalise()
 	local inverseMagnitude = 1 / math.sqrt(self.W^2 + self.X^2 + self.Y^2 + self.Z^2)
 
 	return Quaternion.Create(
+		self.W * inverseMagnitude,
 		self.X * inverseMagnitude,
 		self.Y * inverseMagnitude,
-		self.Z * inverseMagnitude,
-		self.W * inverseMagnitude
+		self.Z * inverseMagnitude
 	)
 end
 
@@ -171,6 +177,54 @@ function Quaternion:ConvertToMatrix()
 	})
 end
 
+function Quaternion:Slerp(to, alpha)
+	local w1, x1, y1, z1 = self:Unpack()
+	local w2, x2, y2, z2 = to:Unpack()
+
+	local dot = w1*w2 + x1*x2 + y1*y2 + z1*z2
+
+	if dot < 0 then
+		w2 = -w2
+		x2 = -x2
+		y2 = -y2
+		z2 = -z2
+
+		dot = -dot
+	end
+
+	local rw, rx, ry, rz
+
+	if dot > 0.9995 then
+		local scale1 = 1 - alpha
+		local scale2 = alpha
+
+		rw = scale1*w1 + scale2*w2
+		rx = scale1*x1 + scale2*x2
+		ry = scale1*y1 + scale2*y2
+		rz = scale1*z1 + scale2*z2
+
+		local inverseMagnitude = 1 / math.sqrt(rw*rw + rx*rx + ry*ry + rz*rz)
+
+		rw = rw*inverseMagnitude
+		rx = rx*inverseMagnitude
+		ry = ry*inverseMagnitude
+		rz = rz*inverseMagnitude
+	else
+		local theta = math.acos(dot)
+		local sinTheta = math.sin(theta)
+
+		local scale1 = math.sin((1 - alpha) * theta) / sinTheta
+		local scale2 = math.sin(alpha * theta) / sinTheta
+
+		rw = scale1*w1 + scale2*w2
+		rx = scale1*x1 + scale2*x2
+		ry = scale1*y1 + scale2*y2
+		rz = scale1*z1 + scale2*z2
+	end
+
+	return Quaternion.Create(rw, rx, ry, rz)
+end
+
 function Quaternion:GetReal()
 	return self.W
 end
@@ -183,17 +237,17 @@ function Quaternion:Unpack()
 	return self.W, self.X, self.Y, self.Z
 end
 
-function Quaternion.__add(leftQuaternion, rightQuaternion)
-	local leftW, leftX, leftY, leftZ = leftQuaternion:Unpack()
+function Quaternion.__add(left, right)
+	local leftW, leftX, leftY, leftZ = left:Unpack()
 	local rightW, rightX, rightY, rightZ
 
-	if type(rightQuaternion) == "number" then
-		rightW = rightQuaternion
-		rightX = rightQuaternion
-		rightY = rightQuaternion
-		rightZ = rightQuaternion
+	if type(right) == "number" then
+		rightW = right
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightW, rightX, rightY, rightZ = rightQuaternion:Unpack()
+		rightW, rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Quaternion.Create(
@@ -204,17 +258,17 @@ function Quaternion.__add(leftQuaternion, rightQuaternion)
 	)
 end
 
-function Quaternion.__sub(leftQuaternion, rightQuaternion)
-	local leftW, leftX, leftY, leftZ = leftQuaternion:Unpack()
+function Quaternion.__sub(left, right)
+	local leftW, leftX, leftY, leftZ = left:Unpack()
 	local rightW, rightX, rightY, rightZ
 
-	if type(rightQuaternion) == "number" then
-		rightW = rightQuaternion
-		rightX = rightQuaternion
-		rightY = rightQuaternion
-		rightZ = rightQuaternion
+	if type(right) == "number" then
+		rightW = right
+		rightX = right
+		rightY = right
+		rightZ = right
 	else
-		rightW, rightX, rightY, rightZ = rightQuaternion:Unpack()
+		rightW, rightX, rightY, rightZ = right:Unpack()
 	end
 
 	return Quaternion.Create(
@@ -225,29 +279,31 @@ function Quaternion.__sub(leftQuaternion, rightQuaternion)
 	)
 end
 
-function Quaternion.__mul(leftQuaternion, rightQuaternion)
-	local leftW, leftX, leftY, leftZ = leftQuaternion:Unpack()
-	local rightW, rightX, rightY, rightZ
+function Quaternion.__mul(left, right)
+	local leftW, leftX, leftY, leftZ = left:Unpack()
 
-	if type(rightQuaternion) == "number" then
-		rightW = rightQuaternion
-		rightX = rightQuaternion
-		rightY = rightQuaternion
-		rightZ = rightQuaternion
+	if type(right) == "number" then
+		return Quaternion.Create(
+			leftW*right,
+			leftX*right,
+			leftY*right,
+			leftZ*right
+		)
 	else
-		rightW, rightX, rightY, rightZ = rightQuaternion:Unpack()
+		local rightW, rightX, rightY, rightZ = right:Unpack()
+
+		return Quaternion.Create(
+			leftW*rightW - leftX*rightX - leftY*rightY - leftZ*rightZ,
+			leftW*rightX + leftX*rightW + leftY*rightZ - leftZ*rightY,
+			leftW*rightY - leftX*rightZ + leftY*rightW + leftZ*rightX,
+			leftW*rightZ + leftX*rightY - leftY*rightX + leftZ*rightW
+		)
 	end
 
-	return Quaternion.Create(
-		leftW*rightW - leftX*rightX - leftY*rightY - leftZ*rightZ,
-		leftW*rightX + leftX*rightW + leftY*rightZ - leftZ*rightY,
-		leftW*rightY - leftX*rightZ + leftY*rightW + leftZ*rightX,
-		leftW*rightZ + leftX*rightY - leftY*rightX + leftZ*rightW
-	)
 end
 
-function Quaternion.__div(leftQuaternion, rightQuaternion)
-	return leftQuaternion * (type(rightQuaternion) == "number" and (1 / rightQuaternion) or rightQuaternion:Inverse())
+function Quaternion.__div(left, right)
+	return left * (type(right) == "number" and (1 / right) or right:Inverse())
 end
 
 function Quaternion.__unm(quaternion)
@@ -256,9 +312,9 @@ function Quaternion.__unm(quaternion)
 	return Quaternion.Create(-w, -x, -y, -z)
 end
 
-function Quaternion.__eq(leftQuaternion, rightQuaternion)
-	local leftW, leftX, leftY, leftZ = leftQuaternion:Unpack()
-	local rightW, rightX, rightY, rightZ = rightQuaternion:Unpack()
+function Quaternion.__eq(left, right)
+	local leftW, leftX, leftY, leftZ = left:Unpack()
+	local rightW, rightX, rightY, rightZ = right:Unpack()
 
 	return leftW == rightW and leftX == rightX and leftY == rightY and leftZ == rightZ
 end

@@ -13,19 +13,19 @@ local function CreateFromFile(path)
 		local nodeCount = modelData:getNodeCount()
 		local rootIndex = modelData:getRootNode()
 
-		for index = 1, nodeCount, 1 do
-			if index == rootIndex then
-				model.Name = modelData:getNodeName(index) or "Model"
+		for nodeIndex = 1, nodeCount, 1 do
+			if nodeIndex == rootIndex then
+				model.Name = modelData:getNodeName(nodeIndex) or "Model"
 
-				bodies[index] = model
+				bodies[nodeIndex] = model
 			end
 
-			if index ~= rootIndex or nodeCount == 1 then
+			if nodeIndex ~= rootIndex or nodeCount == 1 then
 				local body = Body.Create()
 				
-				body.Name = modelData:getNodeName(index) or "Body"..math.max(index - 1, 1)
+				body.Name = modelData:getNodeName(nodeIndex) or "Body"..nodeIndex
 				
-				local meshIndex = modelData:getNodeMesh(index)
+				local meshIndex = modelData:getNodeMesh(nodeIndex)
 				local mesh = nil
 
 				if meshIndex then
@@ -190,12 +190,12 @@ local function CreateFromFile(path)
 
 				body.Mesh = mesh
 
-				local angle, axisX, axisY, axisZ = modelData:getNodeOrientation(index)
-				body.Position = Vector3.Create(modelData:getNodePosition(index))
-				body.Scale = Vector3.Create(modelData:getNodeScale(index))
+				local angle, axisX, axisY, axisZ = modelData:getNodeOrientation(nodeIndex)
+				body.Position = Vector3.Create(modelData:getNodePosition(nodeIndex))
+				body.Scale = Vector3.Create(modelData:getNodeScale(nodeIndex))
 				body.Orientation = Quaternion.CreateAxisRotation(angle, Vector3.Create(axisX, axisY, axisZ))
 
-				bodies[index] = body
+				bodies[nodeIndex] = body
 			end
 		end
 
@@ -209,6 +209,42 @@ local function CreateFromFile(path)
 					body.Parent = bodies[parentIndex]
 				end
 			end
+		end
+
+		for animationIndex = 1, modelData:getAnimationCount(), 1 do
+			local animation = Animation.Create()
+
+			animation.Name = modelData:getAnimationName(animationIndex) or "Animation"..animationIndex
+
+			for channelIndex = 1, modelData:getAnimationChannelCount(animationIndex), 1 do
+				local channelProperty = modelData:getAnimationProperty(animationIndex, channelIndex)
+
+				channelProperty = 
+					(channelProperty == "translation" and "Position") or 
+					(channelProperty == "rotation" and "Orientation") or
+					(channelProperty == "scale" and "Scale") or
+					nil
+
+				if channelProperty then
+					local channel = AnimationChannel.Create(
+						bodies[modelData:getAnimationNode(animationIndex, channelIndex)].Name,
+						channelProperty,
+						channelProperty == "Orientation" and Enum.AnimationPropertyType.Quaternion or Enum.AnimationPropertyType.Vector,
+						modelData:getAnimationSmoothMode(animationIndex, channelIndex)
+					)
+
+					for keyframeIndex = 1, modelData:getAnimationKeyframeCount(animationIndex, channelIndex), 1 do
+						local time, x, y, z, w = modelData:getAnimationKeyframe(animationIndex, channelIndex, keyframeIndex)
+						local value = channelProperty == "Orientation" and Quaternion.Create(w, x, y, z) or Vector3.Create(x, y, z)
+
+						channel:AddKeyframe(time, value)
+					end
+
+					animation:AddChannel(channel)
+				end
+			end
+
+			animation.Parent = model
 		end
 
 		modelData:release()

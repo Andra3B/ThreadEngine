@@ -30,7 +30,7 @@ function lovr.conf(t)
 
 	-- Graphics
 	t.graphics.debug = false
-	t.graphics.vsync = false
+	t.graphics.vsync = true
 	t.graphics.stencil = true
 	t.graphics.antialias = true
 	t.graphics.shadercache = true
