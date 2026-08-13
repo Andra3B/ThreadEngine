@@ -1,6 +1,10 @@
 require("init")
 
 function Thread.Load()
+	riggedFigure = Thread.LoadModel("Assets/Models/RiggedFigure.gltf", "Z_UP")
+	animator = Animator.Create()
+	animator.Parent = riggedFigure
+
 	local fps = Label.Create()
 	fps.Name = "FPS"
 	fps.Size = ScaleOffset2.Create(0, 0, 150, 50)
@@ -8,10 +12,6 @@ function Thread.Load()
 	fps.VerticalTextAlignment = Enum.VerticalAlignment.Middle
 	fps.CornerRadius = ScaleOffset4.Create(0, 0, 1, 0, 0, 0, 0, 0)
 	fps.BackgroundColour = Vector4.Create(1, 1, 1, 0.8)
-
-	animatedBox = Model.Create("Assets/Models/BoxAnimated.glb")
-	animator = Animator.Create()
-	animator.Parent = animatedBox
 
 	local floor = Body.Create()
 	floor.Mesh = Thread.Meshes.Cube
@@ -38,13 +38,13 @@ function Thread.Load()
 	Thread.World.Camera.Position = Vector3.Create(0, 1, 2)
 
 	fps.Parent = Thread.Interface
-	animatedBox.Parent = Thread.World
+	riggedFigure.Parent = Thread.World
 	floor.Parent = Thread.World
 end
 
 function Thread.Update(deltaTime)
 	if animator.TimelineDuration == 0 then
-		animator:Play(animatedBox:GetChildWithName("Animation1"))
+		animator:Play(riggedFigure:GetChildWithType("Animation"))
 	end
 
 	local camera = Thread.World.Camera

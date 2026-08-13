@@ -341,7 +341,7 @@ function InterfaceObject:GetTransform()
 	if self._Transform == Class.NIL then
 		self._Transform = Matrix4.CreateTransform(
             Vector3.Create(self.AbsolutePosition.X, self.AbsolutePosition.Y, 0),
-            Vector3.Create(0, 0, -self.AbsoluteAngle),
+            Vector3.Create(0, 0, self.AbsoluteAngle),
             Vector3.One,
             Vector3.Zero
         )
@@ -353,6 +353,12 @@ end
 function InterfaceObject:SetTransform(transform)
 	if transform ~= self._Transform then
 		self._Transform = transform
+
+		if transform ~= Class.NIL then
+			self.AbsolutePosition = Vector2.Create(transform.Position.X, transform.Position.Y)
+			self.AbsoluteAngle = transform.Orientation:GetAngleAxis(true)
+			self.Origin = ScaleOffset2.Zero
+		end
 
 		return true, transform
 	end

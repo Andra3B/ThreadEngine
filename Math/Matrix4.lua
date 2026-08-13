@@ -3,6 +3,10 @@ local Matrix4 = {}
 function Matrix4.Create(components)
 	local self = Class.CreateInstance(nil, Matrix4)
 
+	self._Position = nil
+	self._Orientation = nil
+	self._Scale = nil
+
 	local componentsType = Class.GetType(components)
 	if componentsType == "table" then
 		self.Components = components
@@ -103,6 +107,78 @@ function Matrix4.CreatePerspectiveProjection(aspectRatio, fov, near, far)
 		0, 0, far / (near - far), -1,
 		0, 0, (far*near) / (near - far), 0
 	})
+end
+
+function Matrix4:GetPosition()
+	if not self._Position then
+		local components = self.Components
+
+		self._Position = Vector3.Create(components[13], components[14], components[15])
+	end
+
+	return self._Position
+end
+
+function Matrix4:GetScale()
+	if not self._Scale then
+		local components = self.Components
+
+		self._Scale = Vector3.Create(
+			math.sqrt(components[1]^2 + components[2]^2 + components[3]^2),
+			math.sqrt(components[5]^2 + components[6]^2 + components[7]^2),
+			math.sqrt(components[9]^2 + components[10]^2 + components[11]^2)
+		)
+	end
+
+	return self._Scale
+end
+
+function Matrix4:GetOrientation()
+	if not self._Orientation then
+		local components = self.Components
+		local sx, sy, sz = self.Scale:Unpack()
+
+		local r11, r21, r31 = components[1]/sx, components[2]/sx, components[3]/sx
+		local r12, r22, r32 = components[5]/sy, components[6]/sy, components[7]/sy
+		local r13, r23, r33 = components[9]/sz, components[10]/sz, components[11]/sz
+
+		local trace = r11 + r22 + r33
+		local w, x, y, z
+
+		if trace > 0.0 then
+			local s = math.sqrt(1.0 + trace) * 2.0
+
+			w = 0.25 * s
+			x = (r32 - r23) / s
+			y = (r13 - r31) / s
+			z = (r21 - r12) / s
+		elseif r11 > r22 and r11 > r33 then
+			local s = math.sqrt(1.0 + r11 - r22 - r33) * 2.0
+
+			w = (r32 - r23) / s
+			x = 0.25 * s
+			y = (r21 + r12) / s
+			z = (r13 + r31) / s
+		elseif r22 > r33 then
+			local s = math.sqrt(1.0 + r22 - r11 - r33) * 2.0
+
+			w = (r13 - r31) / s
+			x = (r21 + r12) / s
+			y = 0.25 * s
+			z = (r32 + r23) / s
+		else
+			local s = math.sqrt(1.0 + r33 - r11 - r22) * 2.0
+
+			w = (r21 - r12) / s
+			x = (r13 + r31) / s
+			y = (r32 + r23) / s
+			z = 0.25 * s
+		end
+
+		self._Orientation = Quaternion.Create(w, x, y, z)
+	end
+
+	return self._Orientation
 end
 
 function Matrix4:Transpose()

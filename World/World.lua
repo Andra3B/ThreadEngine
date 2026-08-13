@@ -3,30 +3,26 @@ local World = {}
 local worldResults = nil
 local worldResultsCount = nil
 
-local function OnDescendantAdded(world, descendant)
-	if Class.IsA(descendant, "Light") then
-		local lightIndex = #world._Lights + 1
+local function OnDescendantParentChanged(world, descendant)
+	if descendant:IsA("Light") then
+		if descendant._LightIndex == 0 then
+			local lightIndex = #world._Lights + 1
 
-		if lightIndex <= 32 then
-			table.insert(world._Lights, descendant)
-			
-			descendant._LightIndex = lightIndex
-			descendant.Changed = Class.NIL
-		end
-	end
-end
+			if lightIndex <= 32 then
+				descendant._LightIndex = lightIndex
+				descendant.Changed = Class.NIL
 
-local function OnDescendantRemoved(world, descendant)
-	if Class.IsA(descendant, "Light") then
-		local lightIndex = descendant._LightIndex
+				table.insert(world._Lights, descendant)		
+			end
+		else
+			local lightIndex = descendant._LightIndex
 
-		if lightIndex ~= 0 then
 			table.remove(world._Lights, lightIndex)
 			descendant._LightIndex = 0
 
 			for object in world:IterateDescendants() do
-				if Class.IsA(object, "Light") and object._LightIndex == 0 then
-					OnDescendantAdded(world, object)
+				if object._LightIndex == 0 and Class.IsA(object, "Light") then
+					OnDescendantParentChanged(world, object)
 				end
 			end
 
@@ -92,8 +88,7 @@ function World.Create(tags)
 		layout = "std430"
 	})
 
-	self._DescendantAddedListener = self._Events:Listen("DescendantAdded", OnDescendantAdded)
-	self._DescendantRemovedListener = self._Events:Listen("DescendantAdded", OnDescendantRemoved)
+	self._DescendantParentChangedListener = self._Events:Listen("DescendantParentChanged", OnDescendantParentChanged)
 
 	self._Camera.Parent = self
 
@@ -144,7 +139,7 @@ function World:Draw(pass)
 		pass:send("Cubemap", self._Skybox.EnvironmentMap)
 		pass:send("LOD", 0)
 
-		pass:draw(Thread.Meshes.Cube.Mesh)
+		pass:draw(Thread.Meshes.Cube.Submeshes[1].Mesh)
 		
 		pass:setFaceCull("back")
 
@@ -160,10 +155,27 @@ function World:Draw(pass)
 		pass:send("LightBuffer", self._LightBuffer)
 		pass:send("LightCount", #self._Lights)
 
+		pass:send("BoneTransformCount", 0)
+
+		local skeletons = {}
+		
 		for descendant in self:IterateDescendants() do
-			if Class.IsA(descendant, "Body") then
+			if descendant:IsA("Body") then
 				pass:push("state")
+				local model = descendant:GetAncestorWithType("Model")
+
+				if model then
+					local skeleton = model:GetChildWithName(descendant.Skeleton)
+
+					if skeleton then
+						skeleton:SendToPass(pass)
+					end
+				end
+
 				descendant:Draw(pass)
+
+				pass:send("BoneTransformCount", 0)
+
 				pass:pop("state")
 			end
 		end
@@ -498,11 +510,8 @@ function World:Destroy()
 		self._LightBuffer:release()
 		self._LightBuffer = nil
 
-		self._DescendantAddedListener:Destroy()
-		self._DescendantAddedListener = nil
-
-		self._DescendantRemovedListener:Destroy()
-		self._DescendantRemovedListener = nil
+		self._DescendantParentChangedListener:Destroy()
+		self._DescendantParentChangedListener = nil
 
 		WorldObject.Destroy(self)
 	end

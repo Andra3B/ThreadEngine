@@ -158,19 +158,23 @@ function Class.CreateInstance(instance, class)
 end
 
 function Class:IsA(typeName)
-	local luaType = type(self)
+	if type(typeName) == "string" then
+		local luaType = type(self)
 
-	if luaType == "table" and self.CLASS_INSTANCE_INDICATOR then
-		for class in self:IterateInheritance() do
-			if class.Type == typeName then
-				return true
+		if luaType == "table" and self.CLASS_INSTANCE_INDICATOR then
+			for class in self:IterateInheritance() do
+				if class.Type == typeName then
+					return true
+				end
 			end
-		end
 
-		return false
+			return false
+		end
+		
+		return luaType == typeName
 	end
-	
-	return luaType == typeName
+
+	return false
 end
 
 function Class:GetType()

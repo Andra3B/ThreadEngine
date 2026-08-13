@@ -27,36 +27,38 @@ function Animator:Update(deltaTime)
 				table.remove(self._Timeline, index).Animation = nil
 				index = index - 1
 			elseif self._Time >= animation.Time then
-				for property, channel in pairs(animation.Animation.Channels) do
-					local targetInformation = self._TargetInformation[channel.Target]
-					if not targetInformation then
-						local targetObject = self.Parent:GetDescendantWithName(channel.Target)
+				for target, targetChannels in pairs(animation.Animation.Channels) do
+					for property, channel in pairs(targetChannels) do
+						local targetInformation = self._TargetInformation[target]
+						if not targetInformation then
+							local targetObject = self.Parent:GetDescendantWithName(target)
 
-						targetInformation = targetObject and {targetObject} or table.empty
-						self._TargetInformation[channel.Target] = targetInformation
-					end
+							targetInformation = targetObject and {targetObject} or table.empty
+							self._TargetInformation[target] = targetInformation
+						end
 
-					if targetInformation[1] and targetInformation[1][property] then
-						local targetPropertyInformation = targetInformation[property]
+						if targetInformation[1] and targetInformation[1][property] then
+							local targetPropertyInformation = targetInformation[property]
 
-						local value = channel:Evaluate(self._Time - animation.Time)
+							local value = channel:Evaluate(self._Time - animation.Time)
 
-						if targetPropertyInformation then
-							if
-								channel.PropertyType == Enum.AnimationPropertyType.Quaternion and
-								value:Dot(targetPropertyInformation.QuaternionReference) < 0
-							then
-								value = -value
+							if targetPropertyInformation then
+								if
+									channel.PropertyType == Enum.AnimationPropertyType.Quaternion and
+									value:Dot(targetPropertyInformation.QuaternionReference) < 0
+								then
+									value = -value
+								end
+
+								targetPropertyInformation.ValueSum = targetPropertyInformation.ValueSum + value * animation.Weight
+								targetPropertyInformation.WeightSum = targetPropertyInformation.WeightSum + animation.Weight
+							else
+								targetInformation[property] = {
+									ValueSum = value * animation.Weight,
+									QuaternionReference = channel.PropertyType == Enum.AnimationPropertyType.Quaternion and value or nil,
+									WeightSum = animation.Weight
+								}
 							end
-
-							targetPropertyInformation.ValueSum = targetPropertyInformation.ValueSum + value * animation.Weight
-							targetPropertyInformation.WeightSum = targetPropertyInformation.WeightSum + animation.Weight
-						else
-							targetInformation[property] = {
-								ValueSum = value * animation.Weight,
-								QuaternionReference = channel.PropertyType == Enum.AnimationPropertyType.Quaternion and value or nil,
-								WeightSum = animation.Weight
-							}
 						end
 					end
 				end
@@ -77,7 +79,7 @@ function Animator:Update(deltaTime)
 			end
 		end
 
-		table.clear(self._TargetInformation)
+		table.clear(self._TargetInformation, nil, true)
 
 		if self._Time >= self._TimelineDuration then
 			self:Stop()
@@ -116,9 +118,7 @@ function Animator:Stop()
 	self._TimelineDuration = 0
 	self._Time = 0
 
-	while #self._Timeline > 0 do
-		table.remove(self._Timeline).Animation = nil
-	end
+	table.erase(self._Timeline, nil, true)
 end
 
 function Animator:GetTime()

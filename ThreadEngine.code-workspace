@@ -20,6 +20,19 @@
 				],
 				"cwd": "${workspaceFolder}",
 				"internalConsoleOptions": "openOnSessionStart"
+			},
+			{
+				"name": "Build cgltf",
+				"type": "lua-local",
+				"request": "launch",
+				"program": {
+					"command": "luajit"
+				},
+				"args": [
+					"${workspaceFolder}/cgltf/Build.lua"
+				],
+				"cwd": "${workspaceFolder}",
+				"internalConsoleOptions": "openOnSessionStart"
 			}
 		]
 	}

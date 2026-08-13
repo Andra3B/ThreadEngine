@@ -117,7 +117,7 @@ function Light:Upload(forceUpload)
 				self._Radius or 0,
 				self._Range,
 				{(self._Colour * self._Intensity):Unpack()},
-				{self.AbsolutePosition:Unpack()},
+				{self.Transform.Position:Unpack()},
 				{self.Forward:Unpack()}
 			}}}, self._LightIndex)
 		end
@@ -126,7 +126,7 @@ function Light:Upload(forceUpload)
 	end
 end
 
---[[DependsOn: Enabled, FallOffType, FallOffCoefficient, Radius, Range, Colour, Intensity, AbsolutePosition, Forward]]--
+--[[DependsOn: Enabled, FallOffType, FallOffCoefficient, Radius, Range, Colour, Intensity, Transform, Forward]]--
 function Light:GetChanged()
 	return self._Changed == Class.NIL
 end

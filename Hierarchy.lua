@@ -31,13 +31,9 @@ local function NewIndexMetamethod(self, name, value)
 			end
 
 			if not self.Destroyed then
-				self.Events:Trigger(name.."Changed", setValue, oldValue) 
-
-				if self._Parent then
-					self._Parent.Events:Trigger("Child"..name.."Changed", self, setValue, oldValue)
-				end
-
-				self.Events:TriggerChildren("Parent"..name.."Changed", setValue, oldValue)
+				self._Events:Trigger(name.."Changed", setValue, oldValue) 
+				self._Events:TriggerAncestors("Descendant"..name.."Changed", setValue, oldValue)
+				self._Events:TriggerDescendants("Ancestor"..name.."Changed", setValue, oldValue)
 			end
 		end
 	else
@@ -67,17 +63,21 @@ function Hierarchy:IterateAncestors()
 end
 
 function Hierarchy:GetAncestorWithName(name)
-	for ancestor in self:IterateAncestors() do
-		if ancestor.Name == name then
-			return ancestor
+	if type(name) == "string" then
+		for ancestor in self:IterateAncestors() do
+			if ancestor.Name == name then
+				return ancestor
+			end
 		end
 	end
 end
 
 function Hierarchy:GetAncestorWithType(ancestorType)
-	for ancestor in self:IterateAncestors() do
-		if Class.IsA(ancestor, ancestorType) then
-			return ancestor
+	if type(ancestorType) == "string" then
+		for ancestor in self:IterateAncestors() do
+			if Class.IsA(ancestor, ancestorType) then
+				return ancestor
+			end
 		end
 	end
 end
@@ -86,34 +86,29 @@ function Hierarchy:SetParent(parent, where)
 	local oldParent = self._Parent
 
 	if parent ~= oldParent then
-		if oldParent then
-			for index, currentChild in pairs(oldParent.Children) do
-				if currentChild == self then
-					table.remove(oldParent.Children, index)
-					
-					break
+		if parent == self then
+			return false
+		else
+			if oldParent then
+				for index, currentChild in pairs(oldParent.Children) do
+					if currentChild == self then
+						table.remove(oldParent.Children, index)
+						
+						break
+					end
 				end
+
+				self._Parent = nil
 			end
 
-			self._Parent = nil
+			if parent then
+				table.insert(parent.Children, math.clamp(where or (#parent.Children + 1), 1, #parent.Children + 1), self)
 
-			oldParent.Events:Trigger("DescendantRemoved", self)
-			for ancestor in oldParent:IterateAncestors() do
-				ancestor.Events:Trigger("DescendantRemoved", self)
+				self._Parent = parent
 			end
+
+			return true, parent
 		end
-
-		if parent then
-			table.insert(parent.Children, math.clamp(where or (#parent.Children + 1), 1, #parent.Children + 1), self)
-
-			self._Parent = parent
-
-			for ancestor in self:IterateAncestors() do
-				ancestor.Events:Trigger("DescendantAdded", self)
-			end
-		end
-
-		return true, parent
 	end
 end
 
@@ -122,17 +117,21 @@ function Hierarchy:GetChildren()
 end
 
 function Hierarchy:GetChildWithName(name)
-	for _, child in ipairs(self.Children) do
-		if child.Name == name then
-			return child
+	if type(name) == "string" then
+		for _, child in ipairs(self.Children) do
+			if child.Name == name then
+				return child
+			end
 		end
 	end
 end
 
 function Hierarchy:GetChildWithType(childType)
-	for _, child in ipairs(self.Children) do
-		if Class.IsA(child, childType) then
-			return child
+	if type(childType) == "string" then
+		for _, child in ipairs(self.Children) do
+			if Class.IsA(child, childType) then
+				return child
+			end
 		end
 	end
 end
@@ -152,17 +151,21 @@ function Hierarchy:IterateDescendants()
 end
 
 function Hierarchy:GetDescendantWithName(name)
-	for descendant in self:IterateDescendants() do
-		if descendant.Name == name then
-			return descendant
+	if type(name) == "string" then
+		for descendant in self:IterateDescendants() do
+			if descendant.Name == name then
+				return descendant
+			end
 		end
 	end
 end
 
 function Hierarchy:GetDescendantWithType(descendantType)
-	for descendant in self:IterateDescendants() do
-		if Class.IsA(descendant, descendantType) then
-			return descendant
+	if type(descendantType) == "string" then
+		for descendant in self:IterateDescendants() do
+			if Class.IsA(descendant, descendantType) then
+				return descendant
+			end
 		end
 	end
 end

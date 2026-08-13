@@ -15,21 +15,29 @@ function Animation:GetChannels()
 end
 
 function Animation:AddChannel(channel)
-	if channel and not self._Channels[channel.Property] then
-		self._Channels[channel.Property] = channel
-		self._Duration = math.max(self._Duration, channel.Duration)
+	if channel then
+		local targetChannels = self._Channels[channel.Target]
+		if not targetChannels then
+			targetChannels = {}
+			self._Channels[channel.Target] = targetChannels
+		end
 
-		return true
+		if not targetChannels[channel.Property] then
+			targetChannels[channel.Property] = channel
+			self._Duration = math.max(self._Duration, channel.Duration)
+
+			return true
+		end
 	end
 
 	return false
 end
 
 function Animation:RemoveChannel(channel)
-	channel = self._Channels[type(channel) == "table" and channel.Property or channel]
+	channel = self._Channels[type(channel) == "table" and channel.Target or channel]
 
 	if channel then
-		self._Channels[channel.Property] = nil
+		self._Channels[channel.Target] = nil
 
 		if channel.Duration == self._Duration then
 			self._Duration = 0
@@ -49,7 +57,7 @@ end
 
 function Animation:Destroy()
 	if not self._Destroyed then
-		table.erase(self._Channels, AnimationChannel.Destroy)
+		table.erase(self._Channels, AnimationChannel.Destroy, true)
 		self._Channels = nil
 
 		Hierarchy.Destroy(self)

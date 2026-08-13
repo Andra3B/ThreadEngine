@@ -71,9 +71,15 @@ function EventDirector:Trigger(event, ...)
 	end
 end
 
-function EventDirector:TriggerChildren(event, ...)
-	for _, child in ipairs(self.Source.Children) do
-		child.Events:Trigger(event, ...)
+function EventDirector:TriggerDescendants(event, ...)
+	for descendant in self.Source:IterateDescendants() do
+		descendant.Events:Trigger(event, self.Source, ...)
+	end
+end
+
+function EventDirector:TriggerAncestors(event, ...)
+	for ancestor in self.Source:IterateAncestors() do
+		ancestor.Events:Trigger(event, self.Source, ...)
 	end
 end
 

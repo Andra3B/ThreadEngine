@@ -4,7 +4,7 @@ function Body.Create()
     local self = Class.CreateInstance(WorldObject.Create(), Body)
 
 	self._Mesh = nil
-	self._MeshParts = {}
+	self._Skeleton = nil
 
 	self._Material = nil
 
@@ -39,49 +39,40 @@ function Body:Update(deltaTime)
 	WorldObject.Update(self, deltaTime)
 
 	if self._Collider then
-		self.AbsolutePosition = Vector3.Create(self._Collider:getPosition())
-		self.AbsoluteOrientation = Quaternion.CreateAxisRotation(self._Collider:getOrientation())
+		self.Transform = Matrix4.CreateTransform(
+			Vector3.Create(self._Collider:getPosition()),
+			Quaternion.CreateAxisRotation(self._Collider:getOrientation()),
+			self.Transform.Scale,
+			Vector3.Zero
+		)
 	end
 end
 
 function Body:Draw(pass)
 	if self._Mesh then
-		if not self._Mesh.HasTangents then
-			pass:setShader(Thread.Shaders.WorldNoTangents)
-		end
+		for _, submesh in ipairs(self._Mesh.Submeshes) do
+			local mesh = submesh.Mesh
 
-		if #self._MeshParts > 0 then
-			for _, partIndex in ipairs(self._MeshParts) do
-				local mesh, material = self._Mesh:GetMesh(partIndex)
-				
-				if mesh then
-					material = material or self._Material or Thread.Materials.Default
-
-					material:SendToPass(pass)
-					pass:draw(mesh, self.LovrTransform, 1)
+			if mesh then
+				if submesh.HasTangents then
+					pass:setShader(Thread.Shaders.WorldTangents)
+				else
+					pass:setShader(Thread.Shaders.WorldNoTangents)
 				end
-			end
-		else
-			if #self._Mesh.Parts > 0 then
-				for partIndex = 1, #self._Mesh.Parts, 1 do
-					local mesh, material = self._Mesh:GetMesh(partIndex)
-					material = material or self._Material or Thread.Materials.Default
 
-					material:SendToPass(pass)
-					pass:draw(mesh, self.LovrTransform, 1)
-				end
-			else
-				local material = self._Material or Thread.Materials.Default
+				local material = self._Material or submesh.Material or Thread.Materials.Default
 
 				material:SendToPass(pass)
-				pass:draw(self._Mesh.Mesh, self.LovrTransform, 1)
+				pass:draw(mesh, self.LovrTransform, 1)
 			end
 		end
 	end
 end
 
 function Body:SetParent(parent)
-	if WorldObject.SetParent(self, parent) then
+	local set, setValue = WorldObject.SetParent(self, parent)
+
+	if set then
 		local world = self:GetAncestorWithType("World")
 
 		if world then
@@ -92,25 +83,16 @@ function Body:SetParent(parent)
 			self.Collider = nil
 		end
 	end
+
+	return set, setValue
 end
 
-function Body:SetAbsolutePosition(position)
-	if WorldObject.SetAbsolutePosition(self, position) then
-		if self.Collider and position ~= Class.NIL then
-			self._Collider:setPosition(position:Unpack())
+function Body:SetTransform(transform)
+	if WorldObject.SetTransform(self, transform) then
+		if self.Collider and transform ~= Class.NIL then
+			self._Collider:setPosition(transform.Position:Unpack())
+			self._Collider:setOrientation(transform.Orientation:GetAngleAxis(true))
 		end
-
-		return true, position
-	end
-end
-
-function Body:SetAbsoluteOrientation(orientation)
-	if WorldObject.SetAbsoluteOrientation(self, orientation) then
-		if self.Collider and orientation ~= Class.NIL then
-			self._Collider:setOrientation(orientation:GetAngleAxis(true))
-		end
-
-		return true, orientation
 	end
 end
 
@@ -126,15 +108,15 @@ function Body:SetMesh(mesh)
 	end
 end
 
-function Body:GetMeshParts()
-	return self._MeshParts
+function Body:GetSkeleton()
+	return self._Skeleton
 end
 
-function Body:SetMeshParts(parts)
-	if parts ~= self._MeshParts then
-		self._MeshParts = parts
+function Body:SetSkeleton(skeleton)
+	if skeleton ~= self._Skeleton then
+		self._Skeleton = skeleton
 
-		return true, parts
+		return true, skeleton
 	end
 end
 
@@ -177,10 +159,8 @@ function Body:SetCollider(collider)
 		if collider then
 			collider:setUserData(self)
 			
-			collider:setPose(
-				self.AbsolutePosition.X, self.AbsolutePosition.Y, self.AbsolutePosition.Z,
-				self.AbsoluteOrientation:GetAngleAxis(true)
-			)
+			collider:setPosition(self.Transform.Position:Unpack())
+			collider:setOrientation(self.Transform.Orientation:GetAngleAxis(true))
 
 			collider:setLinearDamping(self._LinearDamping)
 			collider:setAngularDamping(self._AngularDamping)
@@ -557,7 +537,6 @@ end
 function Body:Destroy()
     if not self._Destroyed then
 		self._Mesh = nil
-		self._MeshParts = nil
 
 		self._Material = nil
 
