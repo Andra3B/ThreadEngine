@@ -13,7 +13,10 @@ function Animator.Create()
 	return self
 end
 
+local startTime
 function Animator:Update(deltaTime)
+	startTime = lovr.timer.getTime()
+
 	if self._TimelineDuration > 0 and Class.IsA(self.Parent, "WorldObject") then
 		self._Time = self._Time + deltaTime
 
@@ -85,6 +88,8 @@ function Animator:Update(deltaTime)
 			self:Stop()
 		end
 	end
+
+	print("Time %: "..((lovr.timer.getTime() - startTime) * 100 / deltaTime))
 end
 
 function Animator:GetTimeline()

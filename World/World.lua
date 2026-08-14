@@ -98,7 +98,7 @@ end
 function World:Update(deltaTime)
 	WorldObject.Update(self, deltaTime)
 
-	-- Delta time clamping to prevent massive physics step sizes
+	-- Delta time clamping to prevent massive physics steps
 	self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate + math.min(deltaTime, 0.1)
 
 	for descendant in self:IterateDescendants() do
