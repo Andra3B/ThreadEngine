@@ -1,7 +1,7 @@
 require("init")
 
 function Thread.Load()
-	riggedFigure = Thread.LoadModel("Assets/Models/RiggedFigure.gltf", "Z_UP")
+	riggedFigure = Thread.LoadModel("Assets/Models/RiggedFigure.gltf")
 	animator = Animator.Create()
 	animator.Parent = riggedFigure
 

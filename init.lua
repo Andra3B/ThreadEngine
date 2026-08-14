@@ -970,7 +970,12 @@ function Thread.LoadModel(cgltfData, modelIndex, gltfPath, cache)
 	if cgltfData ~= nil then
 		local cgltfModelNode
 
-		if type(modelIndex) == "number" then
+		if not modelIndex then
+			if cgltfData.scene ~= nil and cgltfData.scene.nodes_count > 0 then
+				cgltfModelNode = cgltfData.scene.nodes[0]
+				modelIndex = tonumber(cgltf.cgltf_node_index(cgltfData, cgltfModelNode)) + 1
+			end
+		elseif type(modelIndex) == "number" then
 			if modelIndex > 0 and modelIndex <= cgltfData.nodes_count then
 				cgltfModelNode = cgltfData.nodes[modelIndex - 1]
 			end
@@ -1021,6 +1026,36 @@ function Thread.LoadModel(cgltfData, modelIndex, gltfPath, cache)
 
 			local objects = {[modelIndex] = model}
 			local skeletons = {}
+
+			if cgltfModelNode.mesh ~= nil then
+				local body = Body.Create()
+
+				body.Name = model.Name
+
+				body.Mesh = Thread.LoadMeshes(
+					cgltfData,
+					tonumber(cgltf.cgltf_mesh_index(cgltfData, cgltfModelNode.mesh)) + 1,
+					gltfPath,
+					cache
+				)
+
+				if cgltfModelNode.skin ~= nil then
+					local skeletonIndex = tonumber(cgltf.cgltf_skin_index(cgltfData, cgltfModelNode.skin)) + 1
+					local skeleton, bones = Thread.LoadSkeletons(cgltfData, skeletonIndex)
+						
+					for boneIndex, bone in pairs(bones) do
+						objects[boneIndex] = bone
+					end
+
+					skeleton.Parent = model
+					
+					skeletons[skeletonIndex] = skeleton
+
+					object.Skeleton = skeleton.Name
+				end
+
+				body.Parent = model
+			end
 
 			for cgltfObject in IterateNodeDescendants(cgltfModelNode) do
 				local object = objects[tonumber(cgltf.cgltf_node_index(cgltfData, cgltfObject)) + 1]

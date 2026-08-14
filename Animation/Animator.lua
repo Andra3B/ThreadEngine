@@ -96,22 +96,24 @@ function Animator:GetTimelineDuration()
 end
 
 function Animator:Play(animation, when, weight)
-	when = when or 0
-	weight = weight or 1
+	if animation then
+		when = when or 0
+		weight = weight or 1
 
-	local index = 1
+		local index = 1
 
-	while index <= #self._Timeline and self._Timeline[index].Time < time do
-		index = index + 1
+		while index <= #self._Timeline and self._Timeline[index].Time < time do
+			index = index + 1
+		end
+
+		self._TimelineDuration = math.max(self._TimelineDuration, when + animation.Duration)
+		
+		table.insert(self._Timeline, index, {
+			Time = when,
+			Animation = animation,
+			Weight = weight
+		})
 	end
-
-	self._TimelineDuration = math.max(self._TimelineDuration, when + animation.Duration)
-	
-	table.insert(self._Timeline, index, {
-		Time = when,
-		Animation = animation,
-		Weight = weight
-	})
 end
 
 function Animator:Stop()
