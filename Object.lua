@@ -15,10 +15,6 @@ local function NewIndexMetamethod(self, name, value)
 					self[dependency] = Class.NIL
 				end
 			end
-
-			if not self.Destroyed then
-				self._Events:Trigger(name.."Changed", setValue, oldValue)
-			end
 		end
 	else
 		rawset(self, name, value)

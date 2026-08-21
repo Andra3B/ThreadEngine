@@ -10,7 +10,7 @@ function Timer.Update(deltaTime)
 			if timer._Time >= timer._Duration then
 				timer.Running = false
 
-				timer._Events:Push("TimerElapsed")
+				timer._Events:Trigger("TimerElapsed")
 
 				if timer._DestroyOnFinish then
 					timer:Destroy()

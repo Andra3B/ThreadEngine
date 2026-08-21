@@ -3,11 +3,6 @@ local Body = {}
 function Body.Create()
     local self = Class.CreateInstance(WorldObject.Create(), Body)
 
-	self._Mesh = nil
-	self._Skeleton = nil
-
-	self._Material = nil
-
 	self._Collider = nil
 	self._ColliderShapes = {}
 
@@ -32,6 +27,8 @@ function Body.Create()
 
 	self._ColliderEnabled = true
 
+	self._AABB = Class.NIL
+
     return self
 end
 
@@ -45,27 +42,6 @@ function Body:Update(deltaTime)
 			self.Transform.Scale,
 			Vector3.Zero
 		)
-	end
-end
-
-function Body:Draw(pass)
-	if self._Mesh then
-		for _, submesh in ipairs(self._Mesh.Submeshes) do
-			local mesh = submesh.Mesh
-
-			if mesh then
-				if submesh.HasTangents then
-					pass:setShader(Thread.Shaders.WorldTangents)
-				else
-					pass:setShader(Thread.Shaders.WorldNoTangents)
-				end
-
-				local material = self._Material or submesh.Material or Thread.Materials.Default
-
-				material:SendToPass(pass)
-				pass:draw(mesh, self.LovrTransform, 1)
-			end
-		end
 	end
 end
 
@@ -93,42 +69,6 @@ function Body:SetTransform(transform)
 			self._Collider:setPosition(transform.Position:Unpack())
 			self._Collider:setOrientation(transform.Orientation:GetAngleAxis(true))
 		end
-	end
-end
-
-function Body:GetMesh()
-	return self._Mesh
-end
-
-function Body:SetMesh(mesh)
-	if mesh ~= self._Mesh then
-		self._Mesh = mesh
-
-		return true, mesh
-	end
-end
-
-function Body:GetSkeleton()
-	return self._Skeleton
-end
-
-function Body:SetSkeleton(skeleton)
-	if skeleton ~= self._Skeleton then
-		self._Skeleton = skeleton
-
-		return true, skeleton
-	end
-end
-
-function Body:GetMaterial()
-	return self._Material
-end
-
-function Body:SetMaterial(material)
-	if material ~= self._Material then
-		self._Material = material
-
-		return true, material
 	end
 end
 
@@ -476,11 +416,11 @@ function Body:SetColliderEnabled(enabled)
 	end
 end
 
-function Body:GetAABB()
+function Body:GetPhysicsAABB()
 	if self.Collider then
 		local minX, maxX, minY, maxY, minZ, maxZ = self._Collider:getAABB()
 
-		return Vector3.Create(minX, minY, minZ), Vector3.Create(maxX, maxY, maxZ)
+		return Extents3.Create(minX, minY, minZ, maxX, maxY, maxZ)
 	end
 end
 
@@ -493,6 +433,23 @@ function Body:SetAwake(awake)
 		self._Collider:setAwake(awake)
 
 		return true, awake
+	end
+end
+
+--[[DependsOn: Mesh, Transform]]--
+function Body:GetAABB()
+	if self._AABB == Class.NIL then
+		error("TODO")
+	end
+
+	return self._AABB
+end
+
+function Body:SetAABB(aabb)
+	if aabb ~= self._AABB then
+		self._AABB = aabb
+
+		return true, aabb
 	end
 end
 
@@ -536,10 +493,6 @@ end
 
 function Body:Destroy()
     if not self._Destroyed then
-		self._Mesh = nil
-
-		self._Material = nil
-
 		while #self._ColliderShapes > 0 do
 			local shape = table.remove(self._ColliderShapes)
 
@@ -550,6 +503,8 @@ function Body:Destroy()
 		end
 
 		self.Collider = nil
+
+		self._AABB = nil
 
 		WorldObject.Destroy(self)
 	end

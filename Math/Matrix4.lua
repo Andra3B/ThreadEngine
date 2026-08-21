@@ -249,6 +249,17 @@ function Matrix4:Inverse()
     })
 end
 
+function Matrix4:Absolute()
+	local matrix = self.Components
+
+	return Matrix4.Create({
+		math.abs(matrix[1]), math.abs(matrix[2]), math.abs(matrix[3]), math.abs(matrix[4]),
+		math.abs(matrix[5]), math.abs(matrix[6]), math.abs(matrix[7]), math.abs(matrix[8]),
+		math.abs(matrix[9]), math.abs(matrix[10]), math.abs(matrix[11]), math.abs(matrix[12]),
+		math.abs(matrix[13]), math.abs(matrix[14]), math.abs(matrix[15]), math.abs(matrix[16])
+	})
+end
+
 function Matrix4:Unpack()
 	return unpack(self.Components)
 end
@@ -285,6 +296,15 @@ function Matrix4.__mul(left, right)
             left[3]*right[13] + left[7]*right[14] + left[11]*right[15] + left[15]*right[16],
             left[4]*right[13] + left[8]*right[14] + left[12]*right[15] + left[16]*right[16],
 		})
+	elseif rightType == "Vector4" then
+		local x, y, z, w = right:Unpack()
+
+		return Vector4.Create(
+			left[1]*x + left[5]*y + left[9]*z + left[13]*w,
+        	left[2]*x + left[6]*y + left[10]*z + left[14]*w,
+        	left[3]*x + left[7]*y + left[11]*z + left[15]*w,
+			left[4]*x + left[8]*y + left[11]*z + left[16]*w
+		)
 	elseif rightType == "Vector3" then
 		local x, y, z = right:Unpack()
 

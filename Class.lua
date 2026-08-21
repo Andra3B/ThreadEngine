@@ -89,7 +89,7 @@ function Class.CreateClass(class, typeName, base, classPath, indexMetamethod, ne
 
 			if attributeName == "DependsOn" then
 				if functionName then
-					local property = string.match(functionName, "Get(.+)") or string.match("Is(.+)")
+					local property = string.match(functionName, "Get(.+)") or string.match(functionName, "Is(.+)")
 
 					if property then
 						for _, dependentProperty in pairs(attributeArguments) do

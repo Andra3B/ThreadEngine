@@ -43,8 +43,10 @@ function Interactive:GetPressed()
 end
 
 function Interactive:SetPressed(pressed)
-	if pressed ~= self._Pressed then		
+	if pressed ~= self._Pressed then
 		self._Pressed = pressed
+
+		self._Events:Trigger("PressedChanged", pressed)
 
 		return true, pressed
 	end

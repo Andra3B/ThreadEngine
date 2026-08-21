@@ -1,44 +1,97 @@
 local Mesh = {}
 
-function Mesh.Create(mesh)
-	local self = Class.CreateInstance(Object.Create(), Mesh)
+function Mesh.Create(mesh, aabb)
+	local self = Class.CreateInstance(WorldObject.Create(), Mesh)
 	
-	self._Submeshes = {}
+	self._Mesh = mesh
+
+	self._Material = nil
+
+	self._Skeleton = nil
+
+	self._DoubleSided = false
+
+	self._AABB = aabb
 
 	return self
 end
 
-function Mesh:GetSubmeshes()
-	return self._Submeshes
+function Mesh:Draw(pass)
+	if self._Mesh then
+		local model = self:GetAncestorWithType("Model")
+
+		if model then
+			local skeleton = model:GetChildWithName(self._Skeleton)
+
+			if skeleton then
+				skeleton:SendToPass(pass)
+			end
+		end
+
+		pass:setFaceCull(self._DoubleSided and "none" or "back")
+
+		local material = self._Material or Thread.Materials.Default
+		material:SendToPass(pass)
+
+		pass:draw(self._Mesh, self.LovrTransform, 1)
+	end
 end
 
-function Mesh:AddSubmesh(submesh)
-	for _, currentSubmesh in ipairs(self._Submeshes) do
-		if submesh == currentSubmesh then
-			return
-		end
-	end
-
-	table.insert(self._Submeshes, submesh)
+function Mesh:GetMesh()
+	return self._Mesh
 end
 
-function Mesh:RemoveSubmesh(submesh)
-	for index, currentSubmesh in ipairs(self._Submeshes) do
-		if submesh == currentSubmesh then
-			table.remove(self._Submeshes, index)
+function Mesh:GetMaterial()
+	return self._Material
+end
 
-			return
-		end
+function Mesh:SetMaterial(material)
+	if material ~= self._Material then
+		self._Material = material
+
+		return true, material
 	end
+end
+
+function Mesh:GetSkeleton()
+	return self._Skeleton
+end
+
+function Mesh:SetSkeleton(skeleton)
+	if skeleton ~= self._Skeleton then
+		self._Skeleton = skeleton
+
+		return true, skeleton
+	end
+end
+
+function Mesh:GetDoubleSided()
+	return self._DoubleSided
+end
+
+function Mesh:SetDoubleSided(doubleSided)
+	if doubleSided ~= self._DoubleSided then
+		self._DoubleSided = doubleSided
+
+		return true, doubleSided
+	end
+end
+
+function Mesh:GetAABB()
+	return self._AABB
 end
 
 function Mesh:Destroy()
 	if not self._Destroyed then
-		table.erase(self._Submeshes, Submesh.Destroy)
-		self._Submeshes = nil
+		self._Mesh:release()
+		self._Mesh = nil
 
-		Object.Destroy(self)
+		self._Material = nil
+
+		self._AABB = nil
+
+		WorldObject.Destroy(self)
 	end
 end
 
-return Class.CreateClass(Mesh, "Mesh", Object, scriptpath())
+return Class.CreateClass(Mesh, "Mesh", WorldObject, scriptpath())

@@ -34,11 +34,6 @@ struct _Material {
 	float NormalScale;
 
 	float OcclusionStrength;
-
-	vec2 UVShift;
-	vec2 UVScale;
-
-	float AlphaCutoff;
 };
 
 uniform textureCube Skybox;
@@ -186,10 +181,6 @@ vec4 lovrmain() {
 	}
 
 	vec4 finalColour = vec4(colour + surface.emissive, surface.baseColor.a);
-
-	if (surface.baseColor.a < ObjectMaterial.AlphaCutoff) {
-		discard;
-	}
 
 	return finalColour;
 }

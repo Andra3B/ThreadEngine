@@ -21,11 +21,6 @@ function Material.Create()
 	self._OcclusionStrength = 0
 	self._OcclusionTexture = nil
 
-	self._UVShift = Vector2.Zero
-	self._UVScale = Vector2.One
-
-	self._AlphaCutoff = 0
-
 	self._Buffer = lovr.graphics.newBuffer({
 		{name = "Colour", type = "vec4"},
 		{name = "Glow", type = "vec4"},
@@ -33,9 +28,6 @@ function Material.Create()
 		{name = "Roughness", type = "float"},
 		{name = "NormalScale", type = "float"},
 		{name = "OcclusionStrength", type = "float"},
-		{name = "UVShift", type = "vec2"},
-		{name = "UVScale", type = "vec2"},
-		{name = "AlphaCutoff", type = "float"},
 		layout = "std430"
 	}, 1)
 	self._Changed = Class.NIL
@@ -187,18 +179,6 @@ function Material:SetOcclusionTexture(texture)
 	end
 end
 
-function Material:GetUVShift()
-	return self._UVShift
-end
-
-function Material:SetUVShift(shift)
-	if shift ~= self._UVShift then
-		self._UVShift = shift
-
-		return true, shift
-	end
-end
-
 function Material:GetUVScale()
 	return self._UVScale
 end
@@ -211,23 +191,11 @@ function Material:SetUVScale(scale)
 	end
 end
 
-function Material:GetAlphaCutoff()
-	return self._AlphaCutoff
-end
-
-function Material:SetAlphaCutoff(cutoff)
-	if cutoff ~= self._AlphaCutoff then
-		self._AlphaCutoff = cutoff
-
-		return true, cutoff
-	end
-end
-
 function Material:GetBuffer()
 	return self._Buffer
 end
 
---[[DependsOn: Colour, Glow, Metalness, Roughness, NormalScale, NormalTexture, OcclusionStrength, UVShift, UVScale, AlphaCutoff]]--
+--[[DependsOn: Colour, Glow, Metalness, Roughness, NormalScale, NormalTexture, OcclusionStrength]]--
 function Material:GetChanged()
 	return self._Changed == Class.NIL
 end
@@ -248,10 +216,7 @@ function Material:Upload(forceUpload)
 			self._Metalness,
 			self._Roughness,
 			self._NormalTexture and self._NormalScale or -1, -- Disable normal mapping if normal map isnt given
-			self._OcclusionStrength,
-			{self._UVShift:Unpack()},
-			{self._UVScale:Unpack()},
-			self._AlphaCutoff
+			self._OcclusionStrength
 		}})
 
 		self.Changed = false
@@ -286,9 +251,6 @@ function Material:Destroy()
 		self._NormalTexture = nil
 
 		self._OcclusionTexture = nil
-
-		self._UVShift = nil
-		self._UVScale = nil
 
 		self._Buffer:release()
 		self._Buffer = nil

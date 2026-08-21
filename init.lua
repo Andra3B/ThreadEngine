@@ -16,7 +16,7 @@ end
 
 table.clone = function(tab, cloneCallback)
 	local clonedTable = {}
-
+	
 	for key, value in pairs(tab) do
 		if Class.GetType(value) == "table" then
 			clonedTable[key] = table.clone(value, cloneCallback)
@@ -24,7 +24,7 @@ table.clone = function(tab, cloneCallback)
 			clonedTable[key] = cloneCallback and cloneCallback(value) or value
 		end
 	end
-
+	
 	return clonedTable
 end
 
@@ -103,7 +103,6 @@ WorldObject = require("World.WorldObject")
 World = require("World.World")
 Model = require("World.Model")
 Mesh = require("World.Mesh")
-Submesh = require("World.Submesh")
 Skeleton = require("World.Skeleton")
 Bone = require("World.Bone")
 Body = require("World.Body")
@@ -125,7 +124,7 @@ Label = require("Interface.Label")
 Button = require("Interface.Button")
 ScrollFrame = require("Interface.ScrollFrame")
 
-cgltf = require("cgltf")
+Assimp = require("Assimp")
 
 local MOUSE_INPUTS = {
 	"m_leftmousebutton",
@@ -134,7 +133,7 @@ local MOUSE_INPUTS = {
 	"m_firstmousebutton",
 	"m_secondmousebutton"
 }
-
+	
 local DEFAULT_ENGINE_OPTIONS = {
 	Window = {
 		width = 1080,
@@ -145,17 +144,19 @@ local DEFAULT_ENGINE_OPTIONS = {
 		icon = nil
 	}
 }
-
+			
 Thread = {}
-
+			
 Thread._SkyboxBlockHarmonicsBuffer = nil
+
+Thread._Passes = {}
 
 Thread.Shaders = {}
 Thread.Meshes = {}
 Thread.Materials = {}
 
 Thread.LovrMatrixIdentity = nil
-Thread.CubemapMatrices = table.new(0, 7)
+Thread.CubemapMatrices = table.new(7, 0)
 
 Thread.DefaultSkybox = nil
 
@@ -208,6 +209,8 @@ local function ThreadQuit(exitCode)
 	table.erase(Thread.Meshes, Mesh.Destroy)
 	table.erase(Thread.Shaders, LovrResourceRelease)
 
+	table.erase(Thread._Passes, LovrResourceRelease)
+
 	Thread._SkyboxBlockHarmonicsBuffer:release()
 	Thread._SkyboxBlockHarmonicsBuffer = nil
 end
@@ -218,15 +221,18 @@ function Thread.PhysicsUpdate(deltaTime) end
 function Thread.Quit(exitCode) end
 function Thread.Restart() end
 
+function Thread.AddPass(pass)
+	table.insert(Thread._Passes, pass)
+end
+
 function Thread.UpdateSkybox(skybox)
 	local mipmapCount = skybox.EnvironmentMap:getMipmapCount()
 	local skyboxSize = skybox.EnvironmentMap:getWidth()
 
-	local passes = table.new(0, mipmapCount + 1)
-
 	for mipmap = 1, mipmapCount, 1 do
 		local view = lovr.graphics.newTextureView(skybox.EnvironmentMap, {["mipmap"] = mipmap})
 		local renderPass = lovr.graphics.newPass(view)
+		view:release()
 
 		renderPass:setFaceCull("front")
 
@@ -251,10 +257,9 @@ function Thread.UpdateSkybox(skybox)
 		renderPass:setViewPose(5, Thread.CubemapMatrices[6])
 		renderPass:setViewPose(6, Thread.CubemapMatrices[7])
 
-		renderPass:draw(Thread.Meshes.Cube.Submeshes[1].Mesh)
+		renderPass:draw(Thread.Meshes.Cube.Mesh)
 
-		table.insert(passes, renderPass)
-		view:release()
+		Thread.AddPass(renderPass)
 	end
 
 	local computePass = lovr.graphics.newPass()
@@ -278,884 +283,963 @@ function Thread.UpdateSkybox(skybox)
 
 	computePass:compute(1, 1, 1)
 
-	table.insert(passes, computePass)
-	
-	lovr.graphics.submit(passes)
-	table.erase(passes, LovrResourceRelease)
+	Thread.AddPass(computePass)
 end
 
-local cgltfStrings = {Active = 0}
-local cgltfOptions = ffi.new("cgltf_options[1]", {{
-	file = {
-		read = function(_, _, path, size, data)
-			local content = lovr.filesystem.read(ffi.string(path))
+local function GetASCIICharacterFromHexValue(hex)
+	return string.char(tonumber(hex, 16))
+end
 
-			if content then
-				table.insert(cgltfStrings, content)
-				cgltfStrings.Active = cgltfStrings.Active + 1
+local function URIToASCIIString(path)
+	return string.gsub(path, "%%(%x%x)", GetASCIICharacterFromHexValue)
+end
 
-				size[0] = #content
-				data[0] = ffi.cast("void*", content)
+local function GetStringFromAiString(value)
+	return value.length > 0 and ffi.string(value.data, value.length) or nil
+end
 
-				return cgltf.cgltf_result_success
-			end
+local function GetMatrix4FromAiMatrix(transformation)
+	return Matrix4.Create({
+		transformation.a1, transformation.b1, transformation.c1, transformation.d1,
+		transformation.a2, transformation.b2, transformation.c2, transformation.d2,
+		transformation.a3, transformation.b3, transformation.c3, transformation.d3,
+		transformation.a4, transformation.b4, transformation.c4, transformation.d4
+	})
+end
 
-			return cgltf.cgltf_result_file_not_found
-		end,
+local function PointerToNumber(pointer)
+	return tonumber(ffi.cast("uintptr_t", pointer))
+end
 
-		release = function()
-			cgltfStrings.Active = cgltfStrings.Active - 1
+local assimpFiles = {Active = 0}
+local assimpFileCallbacks = {
+	ReadProc = function(assimpFile, buffer, elementSize, count)
+		local file = assimpFiles[PointerToNumber(assimpFile[0].UserData)][1]
 
-			if cgltfStrings.Active == 0 then
-				while #cgltfStrings > 0 do
-					table.remove(cgltfStrings)
-				end
-			end
+		elementSize = tonumber(elementSize)
+		count = tonumber(count)
+
+		local content, bytesRead = file:read(elementSize * count)
+
+		if content and bytesRead > 0 then
+			ffi.copy(buffer, content, bytesRead)
+
+			return bytesRead / elementSize
 		end
-	}
-}})
 
-local function LoadCgltfData(path)
-	local cgltfData = ffi.new("cgltf_data*[1]")
+		return 0
+	end,
 
-	if
-		cgltf.cgltf_parse_file(cgltfOptions, path, cgltfData) == cgltf.cgltf_result_success and
-		cgltf.cgltf_validate(cgltfData[0]) == cgltf.cgltf_result_success
-	then
-		cgltfData = cgltfData[0]
+	WriteProc = function(assimpFile, buffer, elementSize, count)
+		local file = assimpFiles[PointerToNumber(assimpFile[0].UserData)][1]
 
-		if cgltf.cgltf_load_buffers(cgltfOptions, cgltfData, path) == cgltf.cgltf_result_success then
-			return cgltfData
+		elementSize = tonumber(elementSize)
+		count = tonumber(count)
+
+		local preWritePosition = file:tell()
+
+		file:write(ffi.string(buffer, elementSize * count))
+
+		return (file:tell() - preWritePosition) / elementSize
+	end,
+
+	TellProc = function(assimpFile)
+		local file = assimpFiles[PointerToNumber(assimpFile[0].UserData)][1]
+
+		return file:tell()
+	end,
+
+	FileSizeProc = function(assimpFile)
+		local file = assimpFiles[PointerToNumber(assimpFile[0].UserData)][1]
+
+		return file:getSize() or 0
+	end,
+
+	SeekProc = function(assimpFile, position, origin)
+		local file = assimpFiles[PointerToNumber(assimpFile[0].UserData)][1]
+
+		position = tonumber(position)
+
+		if origin == Assimp.aiOrigin_SET then
+			file:seek(position)
+		elseif origin == Assimp.aiOrigin_CUR then
+			file:seek(file:tell() + position)
 		else
-			cgltf.cgtlf_free(cgltfData)
+			file:seek(file:getSize() - position)
 		end
+
+		return Assimp.aiReturn_SUCCESS
+	end,
+
+	FlushProc = function(assimpFile)
 	end
-end
+}
 
-local function GetBase64DecodedSize(base64) 
-    base64 = ffi.string(base64)
-
-    local padding = 0
-
-    if #base64 > 0 and string.sub(base64, -1) == "=" then
-		padding = padding + 1
-	end
-
-    if #base64 > 1 and string.sub(base64, -2, -2) == "=" then
-		padding = padding + 1
-	end
-
-    return (#base64 * 3 / 4) - padding
-end
-
-local function LoadCgltfTexture(texture, gltfPath, textureOptions)
-	if texture == nil then return end
-
-	local imageData = texture.image
-	local samplerData = texture.sampler
-
-	local texture = nil
-
-	if imageData.uri ~= nil then
-		local uri = ffi.string(imageData.uri)
-
-		if string.sub(uri, 1, 5) == "data:" and string.find(uri, ";base64", 1, true) then
-			local commaStart = string.find(uri, ",", 1, true)
-
-			if commaStart then
-				local pixelData = ffi.new("void*[1]")
-				local base64Data = imageData.uri + commaStart
-
-				if cgltf.cgltf_load_buffer_base64(cgltfOptions, 0, base64Data, pixelData) == cgltf.cgltf_result_success then
-					local pixelByteData = lovr.data.newBlob(GetBase64DecodedSize(base64Data))
-					ffi.copy(pixelByteData:getPointer(), pixelData, pixelByteData:getSize())
-
-					texture = lovr.graphics.newTexture(pixelByteData, textureOptions)
-					pixelByteData:release()
-					cgltf.cgltf_free(pixelData)
-				end
-			end
-		else
-			local directory = string.match(gltfPath, ".+[/\\]")
-			texture = lovr.graphics.newTexture(directory and directory..uri or uri, textureOptions)
-		end
-	elseif imageData.buffer_view ~= nil then
-		local pixelByteData = lovr.data.newBlob(tonumber(imageData.buffer_view.size))
-
-		ffi.copy(
-			pixelByteData:getPointer(),
-			ffi.cast("char*", imageData.buffer_view.buffer.data) + imageData.buffer_view.offset,
-			pixelByteData:getSize()
+local assimpFileIO = ffi.new("aiFileIO[1]", {{
+	OpenProc = function(_, path, mode)
+		-- Paths may still be % encoded so convert it
+		local file = lovr.filesystem.newFile(
+			URIToASCIIString(ffi.string(path)),
+			string.find(ffi.string(mode), "r", 1, true) and "r" or "w"
 		)
 
-		texture = lovr.graphics.newTexture(pixelByteData, textureOptions)
-		pixelByteData:release()
-	end
+		if file then
+			local assimpFile = ffi.new("aiFile", {
+				ReadProc = assimpFileCallbacks.ReadProc,
+				WriteProc = assimpFileCallbacks.WriteProc,
+				TellProc = assimpFileCallbacks.TellProc,
+				FileSizeProc = assimpFileCallbacks.FileSizeProc,
+				SeekProc = assimpFileCallbacks.SeekProc,
+				FlushProc = assimpFileCallbacks.FlushProc,
+				UserData = ffi.cast("char*", #assimpFiles + 1)
+			})
 
-	if texture and samplerData ~= nil then
-		local minFilterType = samplerData.min_filter
-		local magFilterType = samplerData.mag_filter
+			table.insert(assimpFiles, {file, assimpFile})
+			assimpFiles.Active = assimpFiles.Active + 1
 
-		local horizontalWrapType = samplerData.wrap_s
-		local verticalWrapType = samplerData.wrap_t
+			return assimpFile
+		end
+	end,
 
-		texture:setSampler(lovr.graphics.newSampler({
-			filter = {(
-					minFilterType == cgltf.cgltf_filter_type_undefined or
-					minFilterType == cgltf.cgltf_filter_type_linear or
-					minFilterType == cgltf.cgltf_filter_type_linear_mipmap_nearest or
-					minFilterType == cgltf.cgltf_filter_type_linear_mipmap_linear
-				) and "linear" or "nearest", (
-					magFilterType == cgltf.cgltf_filter_type_undefined or
-					magFilterType == cgltf.cgltf_filter_type_linear or
-					magFilterType == cgltf.cgltf_filter_type_linear_mipmap_nearest or
-					magFilterType == cgltf.cgltf_filter_type_linear_mipmap_linear
-				) and "linear" or "nearest", (
-					minFilterType == cgltf.cgltf_filter_type_undefined or
-					minFilterType == cgltf.cgltf_filter_type_nearest_mipmap_linear or
-					minFilterType == cgltf.cgltf_filter_type_linear_mipmap_linear
-				) and "linear" or "nearest"
-			},
+	CloseProc = function(_, assimpFile)
+		assimpFiles.Active = assimpFiles.Active - 1
 
-			wrap = {
-				(horizontalWrapType == cgltf.cgltf_wrap_mode_clamp_to_edge and "clamp") or
-				(horizontalWrapType == cgltf.cgltf_wrap_mode_mirrored_repeat and "mirror") or
-				"repeat",
-				(verticalWrapType == cgltf.cgltf_wrap_mode_clamp_to_edge and "clamp") or
-				(verticalWrapType == cgltf.cgltf_wrap_mode_mirrored_repeat and "mirror") or
-				"repeat",
-				"repeat"
-			}
-		}))
-	end
+		if assimpFiles.Active == 0 then
+			while #assimpFiles > 0 do
+				local currentAssimpFile = table.remove(assimpFiles)
 
-	return texture
-end
-
-local function NodeDescendantIterator(node)
-	for index = 0, tonumber(node.children_count) - 1, 1 do
-		coroutine.yield(node.children[index])
-	end
-
-	for index = 0, tonumber(node.children_count) - 1, 1 do
-		NodeDescendantIterator(node.children[index])
-	end
-end
-
-local function IterateNodeDescendants(node)
-	return coroutine.wrap(NodeDescendantIterator), node, nil
-end
-
-function Thread.LoadMaterials(cgltfData, materialIndex, gltfPath, cache)
-	cache = cache or {}
-
-	if not cache.Materials then
-		cache.Materials = {}
-	end
-
-	local result = cache.Materials[materialIndex]
-	if result then return result end
-
-	local destroyData = false
-	if type(cgltfData) == "string" then
-		gltfPath = cgltfData
-		cgltfData = LoadCgltfData(gltfPath)
-		destroyData = true
-	end
-
-	result = {}
-
-	if cgltfData ~= nil then
-		for index = materialIndex and materialIndex - 1 or 0, materialIndex and materialIndex - 1 or tonumber(cgltfData.materials_count) - 1, 1 do
-			local material = cache.Materials[index + 1]
-			
-			if not material then
-				material = Material.Create()
-
-				local cgltfMaterial = cgltfData.materials[index]
-
-				material.Name = cgltfMaterial.name ~= nil and ffi.string(cgltfMaterial.name) or nil
-
-				local colour = cgltfMaterial.pbr_metallic_roughness.base_color_factor
-				material.Colour = Vector4.Create(colour[0], colour[1], colour[2], colour[3])
-				material.ColourTexture = LoadCgltfTexture(
-					cgltfMaterial.pbr_metallic_roughness.base_color_texture.texture,
-					gltfPath, {
-						type = "2d",
-						format = "rgba8",
-						linear = false,
-						mipmaps = true,
-						usage = {"sample"}
-					}
-				)
-
-				local glow = cgltfMaterial.emissive_factor
-				material.Glow = Vector4.Create(glow[0], glow[1], glow[2], cgltfMaterial.emissive_strength.emissive_strength)
-				material.GlowTexture = LoadCgltfTexture(
-					cgltfMaterial.emissive_texture.texture,
-					gltfPath, {
-						type = "2d",
-						format = "rgba8",
-						linear = false,
-						mipmaps = true,
-						usage = {"sample"}
-					}
-				)
-
-				material.Metalness = cgltfMaterial.pbr_metallic_roughness.metallic_factor
-				material.MetalnessTexture = LoadCgltfTexture(
-					cgltfMaterial.pbr_metallic_roughness.metallic_roughness_texture.texture,
-					gltfPath, {
-						type = "2d",
-						format = "rgba8",
-						linear = true,
-						mipmaps = true,
-						usage = {"sample"}
-					}
-				)
-
-				material.Roughness = cgltfMaterial.pbr_metallic_roughness.roughness_factor
-				material.RoughnessTexture = material.MetalnessTexture
-
-				material.NormalScale = cgltfMaterial.normal_texture.scale
-				material.NormalTexture = LoadCgltfTexture(
-					cgltfMaterial.normal_texture.texture,
-					gltfPath, {
-						type = "2d",
-						format = "rgba8",
-						linear = true,
-						mipmaps = true,
-						usage = {"sample"}
-					}
-				)
-
-				material.OcclusionStrength = cgltfMaterial.occlusion_texture.scale
-				material.OcclusionTexture =
-					cgltfMaterial.occlusion_texture.texture == cgltfMaterial.pbr_metallic_roughness.metallic_roughness_texture.texture and material.MetalnessTexture or LoadCgltfTexture(
-					cgltfMaterial.occlusion_texture.texture,
-					gltfPath, {
-						type = "2d",
-						format = "rgba8",
-						linear = true,
-						mipmaps = true,
-						usage = {"sample"}
-					}
-				)
-
-				material.AlphaCutoff = cgltfMaterial.alpha_cutoff
-
-				cache.Materials[index + 1] = material
-			end
-
-			if materialIndex then
-				result = material
-			else
-				table.insert(result, material)
+				currentAssimpFile[1]:release()
+				currentAssimpFile[1] = nil
+				currentAssimpFile[2] = nil
 			end
 		end
+	end
+}})
 
-		if destroyData then
-			cgltf.cgltf_free(cgltfData)
+local function LoadAssimpScene(path)
+	if type(path) == "cdata" then
+		return path, false
+	elseif type(path) == "string" then
+		local properties = Assimp.aiCreatePropertyStore()
+
+		Assimp.aiSetImportPropertyInteger(
+			properties, Assimp.AI_CONFIG_PP_RVC_FLAGS,
+			bit.bor(Assimp.aiComponent_LIGHTS, Assimp.aiComponent_CAMERAS)
+		)
+		Assimp.aiSetImportPropertyInteger(properties, Assimp.AI_CONFIG_PP_LBW_MAX_WEIGHTS, 4)
+		Assimp.aiSetImportPropertyInteger(properties, Assimp.AI_CONFIG_IMPORT_FBX_PRESERVE_PIVOTS, 0)
+
+		local scene = Assimp.aiImportFileExWithProperties(
+			path,
+			bit.bor(
+				Assimp.aiProcess_CalcTangentSpace,
+				Assimp.aiProcess_JoinIdenticalVertices,
+				Assimp.aiProcess_Triangulate,
+				Assimp.aiProcess_RemoveComponent,
+				Assimp.aiProcess_LimitBoneWeights,
+				Assimp.aiProcess_ValidateDataStructure,
+				Assimp.aiProcess_ImproveCacheLocality,
+				Assimp.aiProcess_FixInfacingNormals,
+				Assimp.aiProcess_PopulateArmatureData,
+				Assimp.aiProcess_GenUVCoords,
+				Assimp.aiProcess_TransformUVCoords,
+				Assimp.aiProcess_GenBoundingBoxes,
+				Assimp.aiProcess_FlipUVs
+			),
+			assimpFileIO,
+			properties
+		)
+		
+		Assimp.aiReleasePropertyStore(properties)
+
+		if scene == nil then
+			return nil, false, "Failed to import \""..path.."\"!: "..ffi.string(Assimp.aiGetErrorString())
+		else
+			return scene, true
 		end
 	end
-
-	return result, cache
 end
 
-Enum.DrawMode = Enum.Create({
-	Points = "points",
-	Lines = "lines",
-	Triangles = "triangles"
-})
+local function PopulateCacheNodes(node, cache, depth)
+	local nodeInfo = {
+		Node = node,
+		Name = GetStringFromAiString(node.mName),
+		Class = Body,
+		Depth = depth,
+		Parent = cache.Nodes[PointerToNumber(node.mParent)],
+		Object = nil
+	}
 
-function Thread.LoadMeshes(cgltfData, meshIndex, gltfPath, cache)
-	cache = cache or {}
+	cache.Nodes[PointerToNumber(node)] = nodeInfo
 
-	if not cache.Meshes then
-		cache.Meshes = {}
+	table.insert(cache.OrderedNodes, nodeInfo)
+
+	for index = 0, node.mNumChildren - 1, 1 do
+		PopulateCacheNodes(node.mChildren[index], cache, depth + 1)
+	end
+end
+
+local function GetLowestCommonAncestorNode(a, b)
+	while a.Depth > b.Depth do
+		a = a.Parent
 	end
 
-	local result = cache.Meshes[meshIndex]
-	if result then return result end
-
-	local destroyData = false
-	if type(cgltfData) == "string" then
-		gltfPath = cgltfData
-		cgltfData = LoadCgltfData(gltfPath)
-		destroyData = true
+	while a.Depth < b.Depth do
+		b = b.Parent
 	end
 
-	result = {}
+	while a ~= b do
+		a = a.Parent
+		b = b.Parent
+	end
 
-	if cgltfData ~= nil then
-		local vertices = {}
-		local indices = {}
+	return a
+end
 
-		for index = meshIndex and meshIndex - 1 or 0, meshIndex and meshIndex - 1 or tonumber(cgltfData.meshes_count) - 1, 1 do
-			local mesh = cache.Meshes[index + 1]
-			
-			if not mesh then
-				mesh = Mesh.Create()
+local function CreateCacheFromScene(sourcePath, scene)
+	local cache = {
+		Nodes = {},
+		OrderedNodes = {},
+		Meshes = {},
+		Materials = {},
+		Textures = {},
+		Samplers = {},
+		Animations = {},
+		SourceDirectory = string.match(sourcePath, "(.+[/\\])")
+	}
 
-				local cgltfMesh = cgltfData.meshes[index]
+	PopulateCacheNodes(scene.mRootNode, cache, 0)
 
-				mesh.Name = cgltfMesh.name ~= nil and ffi.string(cgltfMesh.name) or nil
+	for _, nodeInfo in ipairs(cache.OrderedNodes) do
+		local node = nodeInfo.Node
 
-				for submeshIndex = 0, tonumber(cgltfMesh.primitives_count) - 1, 1 do
-					local cgltfSubmesh = cgltfMesh.primitives[submeshIndex]
-					local drawMode =
-						(cgltfSubmesh.type == cgltf.cgltf_primitive_type_points and Enum.DrawMode.Points) or
-						(cgltfSubmesh.type == cgltf.cgltf_primitive_type_lines and Enum.DrawMode.Lines) or
-						(cgltfSubmesh.type == cgltf.cgltf_primitive_type_triangles and Enum.DrawMode.Triangles) or
-						nil
+		for index = 0, node.mNumMeshes - 1, 1 do
+			local mesh = scene.mMeshes[node.mMeshes[index]]
+			local skeleton = nil
 
-					if cgltfSubmesh.attributes_count > 0 and drawMode then
-						local position = ffi.new("cgltf_float[3]")
-						local normal = ffi.new("cgltf_float[3]")
-						local tangent = ffi.new("cgltf_float[3]")
-						local uv = ffi.new("cgltf_float[2]")
-						local colour = ffi.new("cgltf_float[4]")
-						local boneIDs = ffi.new("cgltf_uint[4]")
-						local boneWeights = ffi.new("cgltf_float[4]")
+			for boneIndex = 0, mesh.mNumBones - 1, 1 do
+				local bone = mesh.mBones[boneIndex]
+				local boneInfo = cache.Nodes[PointerToNumber(bone.mNode)]
 
-						local hasTangents = false
-						local hasUVs = false
-						local hasColours = false
-						local hasSkeleton = false
+				boneInfo.Class = Bone
+				boneInfo.BoneIndex = boneIndex
+				boneInfo.InverseBindMatrix = GetMatrix4FromAiMatrix(bone.mOffsetMatrix)
 
-						for vertexIndex = 0, tonumber(cgltfSubmesh.attributes[0].data.count) - 1, 1 do
-							for attributeIndex = 0, tonumber(cgltfSubmesh.attributes_count) - 1, 1 do
-								local attribute = cgltfSubmesh.attributes[attributeIndex]
+				skeleton = skeleton and GetLowestCommonAncestorNode(skeleton, boneInfo) or boneInfo
+			end
 
-								if attribute.type == cgltf.cgltf_attribute_type_position then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, position, 3)
-								elseif attribute.type == cgltf.cgltf_attribute_type_normal then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, normal, 3)
-								elseif attribute.type == cgltf.cgltf_attribute_type_tangent then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, tangent, 3)
-
-									hasTangents = true
-								elseif attribute.type == cgltf.cgltf_attribute_type_texcoord then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, uv, 2)
-
-									hasUVs = true
-								elseif attribute.type == cgltf.cgltf_attribute_type_color then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, colour, 4)
-
-									hasColours = true
-								elseif attribute.type == cgltf.cgltf_attribute_type_joints then
-									cgltf.cgltf_accessor_read_uint(attribute.data, vertexIndex, boneIDs, 4)
-
-									hasSkeleton = true
-								elseif attribute.type == cgltf.cgltf_attribute_type_weights then
-									cgltf.cgltf_accessor_read_float(attribute.data, vertexIndex, boneWeights, 4)
-
-									hasSkeleton = true
-								end
-							end
-
-							local vertex = {
-								position[0], position[1], position[2],
-								normal[0], normal[1], normal[2]
-							}
-
-							if hasTangents then
-								table.insert(vertex, tangent[0])
-								table.insert(vertex, tangent[1])
-								table.insert(vertex, tangent[2])
-							end
-
-							if hasUVs then
-								table.insert(vertex, uv[0])
-								table.insert(vertex, uv[1])
-							end
-
-							if hasColours then
-								table.insert(vertex, colour[0])
-								table.insert(vertex, colour[1])
-								table.insert(vertex, colour[2])
-								table.insert(vertex, colour[3])
-							end
-
-							if hasSkeleton then
-								table.insert(vertex, boneIDs[0])
-								table.insert(vertex, boneIDs[1])
-								table.insert(vertex, boneIDs[2])
-								table.insert(vertex, boneIDs[3])
-
-								local weightSum = boneWeights[0] + boneWeights[1] + boneWeights[2] + boneWeights[3]
-
-								if weightSum == 0 then
-									boneWeights[0] = 1
-									weightSum = 1
-								end
-
-								local weightFactor = 1 / weightSum 
-
-								table.insert(vertex, boneWeights[0] * weightFactor)
-								table.insert(vertex, boneWeights[1] * weightFactor)
-								table.insert(vertex, boneWeights[2] * weightFactor)
-								table.insert(vertex, boneWeights[3] * weightFactor)
-							end
-
-							table.insert(vertices, vertex)
-						end
-
-						if cgltfSubmesh.indices ~= nil then
-							local index = ffi.new("cgltf_uint[1]")
-
-							for indexIndex = 0, tonumber(cgltfSubmesh.indices.count) - 1, 1 do
-								cgltf.cgltf_accessor_read_uint(cgltfSubmesh.indices, indexIndex, index, 1)
-								table.insert(indices, index[0] + 1)
-							end
-						end
-
-						local vertexFormat = {
-							{"VertexPosition", "vec3"},
-							{"VertexNormal", "vec3"}
-						}
-
-						if hasTangents then
-							table.insert(vertexFormat, {"VertexTangent", "vec3"})
-						end
-
-						if hasUVs then
-							table.insert(vertexFormat, {"VertexUV", "vec2"})
-						end
-
-						if hasColours then
-							table.insert(vertexFormat, {"VertexColor", "vec4"})
-						end
-
-						if hasSkeleton then
-							table.insert(vertexFormat, {"VertexBoneIDs", "u8x4"})
-							table.insert(vertexFormat, {"VertexBoneWeights", "un8x4"})
-						end
-
-						local submesh = lovr.graphics.newMesh(vertexFormat, vertices, {storage = "gpu"})
-
-						submesh:setIndices(indices)
-						submesh:setDrawMode(drawMode)
-
-						submesh = Submesh.Create(submesh)
-
-						if cgltfSubmesh.material ~= nil then
-							submesh.Material = Thread.LoadMaterials(
-								cgltfData,
-								tonumber(cgltf.cgltf_material_index(cgltfData, cgltfSubmesh.material)) + 1,
-								gltfPath,
-								cache
-							)
-						end
-						
-						mesh:AddSubmesh(submesh)
-
-						table.clear(vertices)
-						table.clear(indices)
-					end
+			if skeleton then
+				if skeleton.Class == Bone then
+					skeleton = skeleton.Parent
 				end
 
-				cache.Meshes[index + 1] = mesh
+				skeleton.Class = Skeleton
 			end
-
-			if meshIndex then
-				result = mesh
-			else
-				table.insert(result, mesh)
-			end
-		end
-
-		if destroyData then
-			cgltf.cgltf_free(cgltfData)
 		end
 	end
 
-	return result, cache
+	return cache
 end
 
-function Thread.LoadAnimations(cgltfData, animationIndex, cache)
-	cache = cache or {}
+local GL_NEAREST = 9728
+local GL_LINEAR = 9729
+local GL_NEAREST_MIPMAP_NEAREST = 9984
+local GL_NEAREST_MIPMAP_LINEAR = 9986
+local GL_LINEAR_MIPMAP_LINEAR = 9987
 
-	if not cache.Animations then
-		cache.Animations = {}
+local TEXTURE_WRAP_MODES = {
+	[Assimp.aiTextureMapMode_Wrap] = "repeat",
+	[Assimp.aiTextureMapMode_Clamp] = "clamp",
+	[Assimp.aiTextureMapMode_Mirror] = "mirror",
+	[Assimp.aiTextureMapMode_Decal] = "clamp"
+}
+
+local function GetMaterialInteger(material, key, textureType, default)
+	local value = ffi.new("int[1]")
+
+	return 
+		Assimp.aiGetMaterialIntegerArray(material, key, textureType or 0, 0, value, nil) == Assimp.aiReturn_SUCCESS and
+		value[0] or
+		default
+end
+
+local function GetMaterialFloat(material, key, textureType, default)
+	local value = ffi.new("ai_real[1]")
+
+	return 
+		Assimp.aiGetMaterialFloatArray(material, key, textureType or 0, 0, value, nil) == Assimp.aiReturn_SUCCESS and
+		value[0] or
+		default
+end
+
+local function GetMaterialColour(material, key, default)
+	local colour = ffi.new("aiColor4D[1]")
+
+	return
+		Assimp.aiGetMaterialColor(material, key, 0, 0, colour) == Assimp.aiReturn_SUCCESS and
+		Vector4.Create(colour[0].r, colour[0].g, colour[0].b, colour[0].a) or
+		default
+end
+
+local function GetMaterialString(material, key, default)
+	local stringData = ffi.new("aiString[1]")
+
+	return
+		Assimp.aiGetMaterialString(material, key, 0, 0, stringData) == Assimp.aiReturn_SUCCESS and
+		GetStringFromAiString(stringData[0]) or
+		default
+end
+
+local function GetMaterialUVChannel(material)
+	local path = ffi.new("aiString[1]")
+	local uvChannel = ffi.new("unsigned int[1]")
+
+	return (
+		Assimp.aiGetMaterialTexture(material, Assimp.aiTextureType_BASE_COLOR, 0, path, nil, uvChannel, nil, nil, nil, nil) == Assimp.aiReturn_SUCCESS or
+		Assimp.aiGetMaterialTexture(material, Assimp.aiTextureType_DIFFUSE, 0, path, nil, uvChannel, nil, nil, nil, nil) == Assimp.aiReturn_SUCCESS
+	) and uvChannel[0] or 0
+end
+
+local function FindEmbeddedTexture(scene, textureFilename)
+	if string.sub(textureFilename, 1, 1) == "*" then
+		return tonumber(string.sub(textureFilename, 2))
 	end
 
-	local result = cache.Animations[animationIndex]
-	if result then return result end
-
-	local destroyData = false
-	if type(cgltfData) == "string" then
-		cgltfData = LoadCgltfData(cgltfData)
-		destroyData = true
+	for index = 0, scene.mNumTextures - 1, 1 do
+		if string.match(GetStringFromAiString(scene.mTextures[index].mFilename), "[^/\\]*$") == textureFilename then
+			return index
+		end
 	end
+end
 
-	result = {}
+local function LoadTexture(scene, material, textureTypes, linear, cache)
+	local texturePath = ffi.new("aiString[1]")
+	local textureWrapping = ffi.new("aiTextureMapMode[2]")
 
-	if cgltfData ~= nil then
-		for index = animationIndex and animationIndex - 1 or 0, animationIndex and animationIndex - 1 or tonumber(cgltfData.animations_count) - 1, 1 do
-			local animation = cache.Animations[index + 1]
-			
-			if not animation then
-				animation = Animation.Create()
+	for _, textureType in ipairs(textureTypes) do
+		textureWrapping[0] = Assimp.aiTextureMapMode_Wrap
+		textureWrapping[1] = Assimp.aiTextureMapMode_Wrap
 
-				local cgltfAnimation = cgltfData.animations[index]
+		if Assimp.aiGetMaterialTexture(
+			material, textureType, 0,
+			texturePath, nil, nil,
+			nil, nil, textureWrapping, nil
+		) == Assimp.aiReturn_SUCCESS then
+			local luaTexturePath = GetStringFromAiString(texturePath[0])
 
-				animation.Name = cgltfAnimation.name ~= nil and ffi.string(cgltfAnimation.name) or nil
+			local textureFilename = string.match(luaTexturePath, "[^/\\]*$")
+			local textureIndex = FindEmbeddedTexture(scene, textureFilename)
 
-				for channelIndex = 0, tonumber(cgltfAnimation.channels_count) - 1, 1 do
-					local cgltfChannel = cgltfAnimation.channels[channelIndex]
+			local texture = cache.Textures[textureIndex or textureFilename]
 
-					local target = cgltfChannel.target_node.name
-					target = target ~= nil and ffi.string(target) or nil
+			if not texture then
+				if textureIndex then
+					local textureData = scene.mTextures[textureIndex]
 
-					if target then
-						local targetProperty = cgltfChannel.target_path
-						targetProperty =
-							(targetProperty == cgltf.cgltf_animation_path_type_translation and "Position") or
-							(targetProperty == cgltf.cgltf_animation_path_type_rotation and "Orientation") or
-							(targetProperty == cgltf.cgltf_animation_path_type_scale and "Scale") or
-							nil
+					if textureData.mHeight == 0 then
+						local textureBlob = lovr.data.newBlob(textureData.mWidth)
+						ffi.copy(textureBlob:getPointer(), textureData.pcData, textureData.mWidth)
 
-						if targetProperty then
-							local cgltfChannelSampler = cgltfChannel.sampler
+						texture = lovr.graphics.newTexture(textureBlob, {
+							type = "2d",
+							linear = linear,
+							mipmaps = true,
+							usage = {"sample"}
+						})
 
-							local smoothingType = cgltfChannelSampler.interpolation
-							smoothingType =
-								(smoothingType == cgltf.cgltf_interpolation_type_linear and Enum.AnimationSmoothing.Linear) or
-								(smoothingType == cgltf.cgltf_interpolation_type_step and Enum.AnimationSmoothing.Step) or
-								nil
+						textureBlob:release()
+					else
+						local texelCount = textureData.mWidth * textureData.mHeight
 
-							if smoothingType then
-								local channel = AnimationChannel.Create(
-									target,
-									targetProperty,
-									targetProperty == "Orientation" and Enum.AnimationPropertyType.Quaternion or Enum.AnimationPropertyType.Vector,
-									smoothingType
-								)
+						local textureBlob = lovr.data.newBlob(texelCount * 4)
+						local pixels = ffi.cast("uint8_t*", textureBlob:getPointer())
+						local texels = textureData.pcData
 
-								local timePointer = ffi.new("cgltf_float[1]")
+						for index = 0, texelCount - 1, 1 do
+							local texel = texels[index]
+							local offset = index * 4
 
-								local valueSize = channel.PropertyType == Enum.AnimationPropertyType.Quaternion and 4 or 3
-								local valueBuffer = ffi.new("cgltf_float[?]", valueSize)
-
-								for keyframeIndex = 0, tonumber(cgltfChannelSampler.input.count) - 1, 1 do
-									cgltf.cgltf_accessor_read_float(cgltfChannelSampler.input, keyframeIndex, timePointer, 1)
-									cgltf.cgltf_accessor_read_float(cgltfChannelSampler.output, keyframeIndex, valueBuffer, valueSize)
-
-									channel:AddKeyframe(
-										timePointer[0],
-										(valueSize == 4 and Quaternion.Create(valueBuffer[3], valueBuffer[0], valueBuffer[1], valueBuffer[2])) or
-										Vector3.Create(valueBuffer[0], valueBuffer[1], valueBuffer[2])
-									)
-								end
-
-								animation:AddChannel(channel)
-							end
+							pixels[offset] = texel.r
+							pixels[offset + 1] = texel.g
+							pixels[offset + 2] = texel.b
+							pixels[offset + 3] = texel.a
 						end
+
+						local image = lovr.data.newImage(width, height, "rgba8", textureBlob)
+						texture = lovr.graphics.newTexture(image, {
+							type = "2d",
+							linear = linear,
+							mipmaps = true,
+							usage = {"sample"}
+						})
+
+						image:release()
+						textureBlob:release()
 					end
-				end
-
-				cache.Animations[index + 1] = animation
-			end
-
-			if animationIndex then
-				result = animation
-			else
-				table.insert(result, animation)
-			end
-		end
-
-		if destroyData then
-			cgltf.cgltf_free(cgltfData)
-		end
-	end
-
-	return result, cache
-end
-
-function Thread.LoadSkeletons(cgltfData, skeletonIndex)
-	local destroyData = false
-	if type(cgltfData) == "string" then
-		cgltfData = LoadCgltfData(cgltfData)
-		destroyData = true
-	end
-
-	local skeletons = {}
-	local bones = {}
-	local skeletonBones = {}
-
-	if cgltfData ~= nil then
-		for index = skeletonIndex and skeletonIndex - 1 or 0, skeletonIndex and skeletonIndex - 1 or tonumber(cgltfData.skins_count) - 1, 1 do
-			local skeleton = Skeleton.Create()
-
-			local cgltfSkeleton = cgltfData.skins[index]
-
-			skeleton.Name = cgltfSkeleton.name ~= nil and ffi.string(cgltfSkeleton.name) or nil
-
-			for boneIndex = 0, tonumber(cgltfSkeleton.joints_count) - 1, 1 do
-				local bone = Bone.Create(boneIndex + 1)
-
-				local cgltfBone = cgltfSkeleton.joints[boneIndex]
-
-				bone.Name = cgltfBone.name ~= nil and ffi.string(cgltfBone.name) or nil
-
-				if cgltfBone.has_matrix == 0 then
-					bone.Position = cgltfBone.has_translation ~= 0 and Vector3.Create(
-						cgltfBone.translation[0], cgltfBone.translation[1], cgltfBone.translation[2]
-					) or Vector3.Zero
-
-					bone.Orientation = cgltfBone.has_rotation ~= 0 and Quaternion.Create(
-						cgltfBone.rotation[3], cgltfBone.rotation[0], cgltfBone.rotation[1], cgltfBone.rotation[2]
-					) or Quaternion.One
-
-					bone.Scale = cgltfBone.has_scale ~= 0 and Vector3.Create(
-						cgltfBone.scale[0], cgltfBone.scale[1], cgltfBone.scale[2]
-					) or Vector3.One
 				else
-					local components = cgltfBone.matrix
-
-					local localTransform = Matrix4.Create({
-						components[0], components[1], components[2], components[3],
-						components[4], components[5], components[6], components[7],
-						components[8], components[9], components[10], components[11],
-						components[12], components[13], components[14], components[15]
+					texture = lovr.graphics.newTexture(cache.SourceDirectory..textureFilename, {
+						type = "2d",
+						linear = linear,
+						mipmaps = true,
+						usage = {"sample"}
 					})
 
-					bone.Position = localTransform.Position
-					bone.Orientation = localTransform.Orientation
-					bone.Scale = localTransform.Scale
+					cache.Textures[textureFilename] = texture
 				end
 
-				local boneNodeIndex = tonumber(cgltf.cgltf_node_index(cgltfData, cgltfBone)) + 1
+				if texture then
+					local minFilter = GetMaterialInteger(material, Assimp._AI_MATKEY_GLTF_MAPPINGFILTER_MIN_BASE, textureType, GL_LINEAR_MIPMAP_LINEAR)
+					local magFilter = GetMaterialInteger(material, Assimp._AI_MATKEY_GLTF_MAPPINGFILTER_MAG_BASE, textureType, GL_LINEAR)
+					local wrapU = TEXTURE_WRAP_MODES[textureWrapping[0]] or "repeat"
+					local wrapV = TEXTURE_WRAP_MODES[textureWrapping[1]] or "repeat"
 
-				skeletonBones[boneNodeIndex] = bone
-				bones[boneNodeIndex] = bone
+					local samplerKey = minFilter..":"..magFilter..":"..wrapU..":"..wrapV
+					local sampler = cache.Samplers[samplerKey]
+
+					if not sampler then
+						local samplerOptions = {
+							filter = {
+								(minFilter == GL_NEAREST or minFilter == GL_NEAREST_MIPMAP_NEAREST or minFilter == GL_NEAREST_MIPMAP_LINEAR) and "nearest" or "linear",
+								magFilter == GL_NEAREST and "nearest" or "linear",
+								(minFilter == GL_NEAREST_MIPMAP_LINEAR or minFilter == GL_LINEAR_MIPMAP_LINEAR) and "linear" or "nearest"
+							},
+							wrap = {wrapU, wrapV, "repeat"}
+						}
+
+						-- Non-mipmapped filters sample the base level only
+						if minFilter == GL_NEAREST or minFilter == GL_LINEAR then
+							samplerOptions.mipmaprange = {0, 0}
+						end
+
+						sampler = lovr.graphics.newSampler(samplerOptions)
+						cache.Samplers[samplerKey] = sampler
+					end
+					
+					texture:setSampler(sampler)
+
+					cache.Textures[textureIndex or textureFilename] = texture
+				end
 			end
+			
+			return texture, textureType
+		end
+	end
+end
 
-			for boneIndex, bone in pairs(skeletonBones) do
-				local cgltfBone = cgltfData.nodes[boneIndex - 1]
+local function LoadMaterial(scene, index, cache)
+	local material = cache.Materials[index]
 
-				bone.Parent = skeletonBones[tonumber(cgltf.cgltf_node_index(cgltfData, cgltfBone.parent)) + 1] or skeleton
-			end
+	if material then
+		return material
+	end
 
-			table.clear(skeletonBones)
+	local materialData = scene.mMaterials[index - 1]
 
-			if skeletonIndex then
-				skeletons = skeleton
+	material = Material.Create()
+	material.Name = GetMaterialString(materialData, Assimp.AI_MATKEY_NAME)
+
+	local colour =
+		GetMaterialColour(materialData, Assimp.AI_MATKEY_BASE_COLOR) or
+		GetMaterialColour(materialData, Assimp.AI_MATKEY_COLOR_DIFFUSE)
+	
+	if colour then
+		colour.W = GetMaterialFloat(materialData, Assimp.AI_MATKEY_OPACITY, 0, colour.W)
+		material.Colour = colour
+	end
+
+	material.ColourTexture = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_BASE_COLOR, Assimp.aiTextureType_DIFFUSE},
+		false, cache
+	)
+
+	local glowTexture = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_EMISSION_COLOR, Assimp.aiTextureType_EMISSIVE},
+		false, cache
+	)
+
+	colour = GetMaterialColour(materialData, Assimp.AI_MATKEY_COLOR_EMISSIVE)
+	local glowStrength = GetMaterialFloat(materialData, Assimp.AI_MATKEY_EMISSIVE_INTENSITY, 0, 1)
+
+	if colour then
+		colour.W = glowStrength
+		material.Glow = colour
+	elseif glowTexture then
+		material.Glow = Vector4.Create(1, 1, 1, glowStrength)
+	end
+
+	material.GlowTexture = glowTexture
+
+	local metalness = GetMaterialFloat(materialData, Assimp.AI_MATKEY_METALLIC_FACTOR, 0)
+
+	if metalness then
+		material.Metalness = metalness
+	end
+
+	material.MetalnessTexture = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_METALNESS},
+		true, cache
+	)
+
+	local roughness = GetMaterialFloat(materialData, Assimp.AI_MATKEY_ROUGHNESS_FACTOR, 0)
+
+	if roughness then
+		material.Roughness = roughness
+	end
+
+	material.RoughnessTexture = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_DIFFUSE_ROUGHNESS},
+		true, cache
+	)
+
+	local normalTexture, normalType = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_NORMALS},
+		true, cache
+	)
+
+	if normalTexture then
+		material.NormalTexture = normalTexture
+		material.NormalScale = GetMaterialFloat(materialData, Assimp._AI_MATKEY_GLTF_SCALE_BASE, normalType, 1)
+	end
+
+	local occlusionTexture, occlusionType = LoadTexture(
+		scene, materialData,
+		{Assimp.aiTextureType_AMBIENT_OCCLUSION, Assimp.aiTextureType_LIGHTMAP},
+		true, cache
+	)
+
+	if occlusionTexture then
+		material.OcclusionTexture = occlusionTexture
+		material.OcclusionStrength = GetMaterialFloat(materialData, Assimp._AI_MATKEY_GLTF_STRENGTH_BASE, occlusionType, 1)
+	end
+
+	cache.Materials[index] = material
+
+	return material
+end
+
+function Thread.LoadMaterials(path, index, cache)
+	local result = nil
+	
+	local scene, destroyData, errorMessage = LoadAssimpScene(path)
+	
+	if scene ~= nil then
+		cache = cache or CreateSceneCache(path, scene)
+
+		if index then
+			if index >= 1 and index <= scene.mNumMaterials then
+				result = LoadMaterial(scene, index, cache)
 			else
-				table.insert(skeletons, skeleton)
+				errorMessage = "Material "..tostring(index).." doesn't exist!"
+			end
+		else
+			result = {}
+
+			for index = 1, scene.mNumMaterials, 1 do
+				table.insert(result, LoadMaterial(scene, index, cache))
 			end
 		end
 
 		if destroyData then
-			cgltf.cgltf_free(cgltfData)
+			Assimp.aiReleaseImport(scene)
 		end
 	end
 
-	return skeletons, bones
+	return result, cache, errorMessage
 end
 
-function Thread.LoadModel(cgltfData, modelIndex, gltfPath, cache)
-	cache = cache or {}
+local function LoadMesh(scene, index, cache)
+	local mesh = cache.Meshes[index]
 
-	local destroyData = false
-	if type(cgltfData) == "string" then
-		gltfPath = cgltfData
-		cgltfData = LoadCgltfData(gltfPath)
-		destroyData = true
+	if mesh then
+		return mesh
 	end
 
-	local model
+	local meshData = scene.mMeshes[index - 1]
 
-	if cgltfData ~= nil then
-		local cgltfModelNode
+	if meshData.mPrimitiveTypes == Assimp.aiPrimitiveType_TRIANGLE then
+		local vertices = table.new(meshData.mNumVertices, 0)
 
-		if not modelIndex then
-			if cgltfData.scene ~= nil and cgltfData.scene.nodes_count > 0 then
-				cgltfModelNode = cgltfData.scene.nodes[0]
-				modelIndex = tonumber(cgltf.cgltf_node_index(cgltfData, cgltfModelNode)) + 1
+		local containsTangents = meshData.mTangents ~= nil
+		local containsColours = meshData.mColors[0] ~= nil
+		local uvChannel = GetMaterialUVChannel(scene.mMaterials[meshData.mMaterialIndex])
+		local containsUVs =
+			meshData.mTextureCoords[uvChannel] ~= nil and
+			meshData.mNumUVComponents[uvChannel] == 2
+		local containsBones = meshData.mNumBones > 0
+		
+		local vertexSize =
+			6 + (containsTangents and 3 or 0) + (containsColours and 3 or 0) + (containsUVs and 2 or 0) + (containsBones and 8 or 0)
+		
+		local vertexFormat = {
+			{"VertexPosition", "vec3"},
+			{"VertexNormal", "vec3"}
+		}
+
+		if containsTangents then
+			table.insert(vertexFormat, {"VertexTangent", "vec3"})
+		end
+
+		if containsColours then
+			table.insert(vertexFormat, {"VertexColor", "vec3"})
+		end
+
+		if containsUVs then
+			table.insert(vertexFormat, {"VertexUV", "vec2"})
+		end
+
+		if containsBones then
+			table.insert(vertexFormat, {"VertexBoneIndices", "u8x4"})
+			table.insert(vertexFormat, {"VertexBoneWeights", "un8x4"})
+		end
+			
+		for vertexIndex = 1, meshData.mNumVertices, 1 do
+			local vertex = table.new(vertexSize, 0)
+
+			local vertexPositionData = meshData.mVertices[vertexIndex - 1]
+			local vertexNormalData = meshData.mNormals[vertexIndex - 1]
+			local vertexTangentData = meshData.mTangents[vertexIndex - 1]
+			local vertexColourData = containsColours and meshData.mColors[0][vertexIndex - 1]
+			local vertexUVData = containsUVs and meshData.mTextureCoords[uvChannel][vertexIndex - 1]
+
+			vertex[1] = vertexPositionData.x
+			vertex[2] = vertexPositionData.y
+			vertex[3] = vertexPositionData.z
+
+			vertex[4] = vertexNormalData.x
+			vertex[5] = vertexNormalData.y
+			vertex[6] = vertexNormalData.z
+
+			if containsTangents then
+				vertex[7] = vertexTangentData.x
+				vertex[8] = vertexTangentData.y
+				vertex[9] = vertexTangentData.z
 			end
-		elseif type(modelIndex) == "number" then
-			if modelIndex > 0 and modelIndex <= cgltfData.nodes_count then
-				cgltfModelNode = cgltfData.nodes[modelIndex - 1]
+
+			if containsColours then
+				table.insert(vertex, vertexColourData.r)
+				table.insert(vertex, vertexColourData.g)
+				table.insert(vertex, vertexColourData.b)
 			end
-		elseif type(modelIndex) == "string" then
-			for nodeIndex = 0, tonumber(cgltfData.nodes_count) - 1, 1 do
-				local cgltfNode = cgltfData.nodes[nodeIndex]
 
-				if cgltfNode.name ~= nil and modelIndex == ffi.string(cgltfNode.name) then
-					cgltfModelNode = cgltfNode
-					modelIndex = nodeIndex + 1
+			if containsUVs then
+				table.insert(vertex, vertexUVData.x)
+				table.insert(vertex, vertexUVData.y)
+			end
 
+			if containsBones then
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+				table.insert(vertex, 0)
+			end
+
+			vertices[vertexIndex] = vertex
+		end
+
+		local skeleton = nil
+
+		if containsBones then
+			local slotCounts = table.new(meshData.mNumVertices, 0)
+			local indexOffset = vertexSize - 8
+			local weightOffset = vertexSize - 4
+
+			for index = 1, #vertices, 1 do
+				slotCounts[index] = 0
+			end
+
+			for boneIndex = 0, meshData.mNumBones - 1, 1 do
+				local bone = meshData.mBones[boneIndex]
+				local boneInfo = cache.Nodes[PointerToNumber(bone.mNode)]
+
+				if not skeleton then
+					repeat
+						skeleton = boneInfo.Parent
+					until skeleton.Class == Skeleton
+				end
+
+				for weightIndex = 0, bone.mNumWeights - 1, 1 do
+					local weightData = bone.mWeights[weightIndex]
+					local vertexIndex = weightData.mVertexId + 1
+					local vertex = vertices[vertexIndex]
+					local slot = slotCounts[vertexIndex] + 1
+
+					if weightData.mWeight > 0 and slot <= 4 then
+						vertex[indexOffset + slot] = boneInfo.BoneIndex
+						vertex[weightOffset + slot] = weightData.mWeight
+
+						slotCounts[vertexIndex] = slot
+					end
+				end
+			end
+
+			for vertexIndex = 1, #vertices, 1 do
+				local vertex = vertices[vertexIndex]
+				local weightSum = vertex[weightOffset + 1] + vertex[weightOffset + 2] + vertex[weightOffset + 3] + vertex[weightOffset + 4]
+
+				if weightSum == 0 then
+					-- No influences then follow the first bone rather than collapsing to the origin
+					vertex[weightOffset + 1] = 1
+				else
+					vertex[weightOffset + 1] = vertex[weightOffset + 1] / weightSum
+					vertex[weightOffset + 2] = vertex[weightOffset + 2] / weightSum
+					vertex[weightOffset + 3] = vertex[weightOffset + 3] / weightSum
+					vertex[weightOffset + 4] = vertex[weightOffset + 4] / weightSum
+				end
+			end
+
+			if meshData.mNumBones > 256 then
+				Log.Warn("Thread", "Skeleton \"%s\" has %d bones; only 256 are supported!", skeleton.Name, meshData.mNumBones)
+			end
+		end
+
+		local indices = table.new(meshData.mNumFaces * 3, 0)
+
+		for faceIndex = 0, meshData.mNumFaces - 1, 1 do
+			local face = meshData.mFaces[faceIndex]
+
+			local offset = faceIndex * 3 + 1
+
+			indices[offset] = face.mIndices[0] + 1
+			indices[offset + 1] = face.mIndices[1] + 1
+			indices[offset + 2] = face.mIndices[2] + 1
+		end
+		
+		local meshAABBData = meshData.mAABB
+		local meshAABB = Extents3.Create(
+			meshAABBData.mMin.x, meshAABBData.mMin.y, meshAABBData.mMin.z,
+			meshAABBData.mMax.x, meshAABBData.mMax.y, meshAABBData.mMax.z
+		) 
+
+		local lovrMesh = lovr.graphics.newMesh(vertexFormat, vertices, {storage = "gpu"})
+
+		lovrMesh:setIndices(indices)
+		lovrMesh:setDrawMode("triangles")
+		lovrMesh:setBoundingBox(
+			meshAABB.Min.X, meshAABB.Min.Y, meshAABB.Min.Z,
+			meshAABB.Max.X, meshAABB.Max.Y, meshAABB.Max.Z
+		)
+
+		mesh = Mesh.Create(lovrMesh, meshAABB)
+
+		mesh.Name = GetStringFromAiString(meshData.mName)
+
+		mesh.Material = Thread.LoadMaterials(scene, meshData.mMaterialIndex + 1, cache)
+
+		mesh.Skeleton = skeleton and skeleton.Name or nil
+		
+		mesh.DoubleSided = GetMaterialInteger(
+			scene.mMaterials[meshData.mMaterialIndex],
+			Assimp.AI_MATKEY_TWOSIDED
+		)
+
+		cache.Meshes[index] = mesh
+	else
+		errorMessage = "Meshes can only consist of triangle or polygon primitives!"
+	end
+
+	return mesh, errorMessage
+end
+
+function Thread.LoadMeshes(path, index, cache)
+	local result = nil
+
+	local scene, destroyData, errorMessage = LoadAssimpScene(path)
+	
+	if scene ~= nil then
+		cache = cache or CreateCacheFromScene(path, scene)
+
+		if index then
+			if index >= 1 and index <= scene.mNumMeshes then
+				result = LoadMesh(scene, index, cache)
+			else
+				errorMessage = "Mesh "..tostring(index).." doesn't exist!"
+			end
+		else
+			result = {}
+
+			for index = 1, scene.mNumMeshes, 1 do
+				table.insert(result, LoadMesh(scene, index, cache))
+			end
+		end
+
+		if destroyData then
+			Assimp.aiReleaseImport(scene)
+		end
+	end
+
+	return result, cache, errorMessage
+end
+
+local function AddAnimationChannel(animation, target, property, keys, keyCount, ticksPerSecond)
+	if keyCount == 0 then
+		return
+	end
+
+	local propertyType =
+		property == "Orientation" and Enum.AnimationPropertyType.Quaternion or
+		Enum.AnimationPropertyType.Vector
+
+	local smoothing =
+		keys[0].mInterpolation == Assimp.aiAnimInterpolation_Step and Enum.AnimationSmoothing.Step or
+		Enum.AnimationSmoothing.Linear
+
+	local channel = AnimationChannel.Create(target, property, propertyType, smoothing)
+
+	for keyIndex = 0, keyCount - 1, 1 do
+		local key = keys[keyIndex]
+		local value = key.mValue
+
+		channel:AddKeyframe(
+			key.mTime / ticksPerSecond,
+			propertyType == Enum.AnimationPropertyType.Quaternion and
+			Quaternion.Create(value.w, value.x, value.y, value.z) or
+			Vector3.Create(value.x, value.y, value.z)
+		)
+	end
+
+	animation:AddChannel(channel)
+end
+
+local function LoadAnimation(scene, index, cache)
+	local animation = cache.Animations[index]
+
+	if animation then
+		return animation
+	end
+
+	local animationData = scene.mAnimations[index - 1]
+
+	animation = Animation.Create()
+	animation.Name = GetStringFromAiString(animationData.mName)
+
+	local ticksPerSecond = animationData.mTicksPerSecond > 0 and animationData.mTicksPerSecond or 25
+
+	for channelIndex = 0, animationData.mNumChannels - 1, 1 do
+		local channelData = animationData.mChannels[channelIndex]
+		local target = GetStringFromAiString(channelData.mNodeName)
+
+		if target then
+			AddAnimationChannel(animation, target, "Position", channelData.mPositionKeys, channelData.mNumPositionKeys, ticksPerSecond)
+			AddAnimationChannel(animation, target, "Orientation", channelData.mRotationKeys, channelData.mNumRotationKeys, ticksPerSecond)
+			AddAnimationChannel(animation, target, "Scale", channelData.mScalingKeys, channelData.mNumScalingKeys, ticksPerSecond)
+		end
+	end
+
+	cache.Animations[index] = animation
+
+	return animation
+end
+
+function Thread.LoadAnimations(path, index, cache)
+	local result = nil
+
+	local scene, destroyData, errorMessage = LoadAssimpScene(path)
+
+	if scene ~= nil then
+		cache = cache or CreateCacheFromScene(path, scene)
+
+		if index then
+			if index >= 1 and index <= scene.mNumAnimations then
+				result = LoadAnimation(scene, index, cache)
+			else
+				errorMessage = "Animation "..tostring(index).." doesn't exist!"
+			end
+		else
+			result = {}
+
+			for index = 1, scene.mNumAnimations, 1 do
+				table.insert(result, LoadAnimation(scene, index, cache))
+			end
+		end
+
+		if destroyData then
+			Assimp.aiReleaseImport(scene)
+		end
+	end
+
+	return result, cache, errorMessage
+end
+
+function Thread.LoadModel(path, cache)
+	local result = nil
+
+	local scene, destroyScene, errorMessage = LoadAssimpScene(path)
+
+	if scene ~= nil then
+		cache = cache or CreateCacheFromScene(path, scene)
+
+		local modelInfo = cache.OrderedNodes[1]
+		modelInfo.Class = Model
+
+		local objects = {}
+
+		for _, nodeInfo in ipairs(cache.OrderedNodes) do
+			local node = nodeInfo.Node
+
+			local object = nodeInfo.Class.Create()
+
+			if nodeInfo.Class == Bone then
+				object._BoneIndex = nodeInfo.BoneIndex
+				object.InverseBindMatrix = nodeInfo.InverseBindMatrix
+			end
+
+			local localTransform = GetMatrix4FromAiMatrix(nodeInfo.Node.mTransformation)
+
+			object.Position = localTransform.Position
+			object.Orientation = localTransform.Orientation
+			object.Scale = localTransform.Scale
+
+			object.Name = nodeInfo.Name or nodeInfo.Class.Type
+
+			nodeInfo.Object = object
+
+			if nodeInfo.Parent then
+				object.Parent = nodeInfo.Parent.Object
+			end
+
+			for index = 0, node.mNumMeshes - 1, 1 do
+				local mesh = Thread.LoadMeshes(scene, node.mMeshes[index] + 1, cache)
+
+				if mesh then
+					mesh.Parent = object
+				end
+			end
+
+			objects[object.Name] = object
+		end
+
+		for animationIndex = 0, tonumber(scene.mNumAnimations) - 1, 1 do
+			local animationData = scene.mAnimations[animationIndex]
+ 
+			for channelIndex = 0, tonumber(animationData.mNumChannels) - 1, 1 do
+				local target = GetStringFromAiString(animationData.mChannels[channelIndex].mNodeName)
+ 
+				if objects[target] then
+					Thread.LoadAnimations(scene, animationIndex + 1, cache).Parent = modelInfo.Object
+					
 					break
 				end
 			end
 		end
 
-		if cgltfModelNode then
-			model = Model.Create()
+		result = modelInfo.Object
 
-			model.Name = cgltfModelNode.name ~= nil and ffi.string(cgltfModelNode.name) or nil
-
-			if cgltfModelNode.has_matrix == 0 then
-				model.Position = cgltfModelNode.has_translation ~= 0 and Vector3.Create(
-					cgltfModelNode.translation[0], cgltfModelNode.translation[1], cgltfModelNode.translation[2]
-				) or Vector3.Zero
-
-				model.Orientation = cgltfModelNode.has_rotation ~= 0 and Quaternion.Create(
-					cgltfModelNode.rotation[3], cgltfModelNode.rotation[0], cgltfModelNode.rotation[1], cgltfModelNode.rotation[2]
-				) or Quaternion.One
-
-				model.Scale = cgltfModelNode.has_scale ~= 0 and Vector3.Create(
-					cgltfModelNode.scale[0], cgltfModelNode.scale[1], cgltfModelNode.scale[2]
-				) or Vector3.One
-			else
-				local components = cgltfModelNode.matrix
-
-				local localTransform = Matrix4.Create({
-					components[0], components[1], components[2], components[3],
-					components[4], components[5], components[6], components[7],
-					components[8], components[9], components[10], components[11],
-					components[12], components[13], components[14], components[15]
-				})
-
-				model.Position = localTransform.Position
-				model.Orientation = localTransform.Orientation
-				model.Scale = localTransform.Scale
-			end
-
-			local objects = {[modelIndex] = model}
-			local skeletons = {}
-
-			if cgltfModelNode.mesh ~= nil then
-				local body = Body.Create()
-
-				body.Name = model.Name
-
-				body.Mesh = Thread.LoadMeshes(
-					cgltfData,
-					tonumber(cgltf.cgltf_mesh_index(cgltfData, cgltfModelNode.mesh)) + 1,
-					gltfPath,
-					cache
-				)
-
-				if cgltfModelNode.skin ~= nil then
-					local skeletonIndex = tonumber(cgltf.cgltf_skin_index(cgltfData, cgltfModelNode.skin)) + 1
-					local skeleton, bones = Thread.LoadSkeletons(cgltfData, skeletonIndex)
-						
-					for boneIndex, bone in pairs(bones) do
-						objects[boneIndex] = bone
-					end
-
-					skeleton.Parent = model
-					
-					skeletons[skeletonIndex] = skeleton
-
-					object.Skeleton = skeleton.Name
-				end
-
-				body.Parent = model
-			end
-
-			for cgltfObject in IterateNodeDescendants(cgltfModelNode) do
-				local object = objects[tonumber(cgltf.cgltf_node_index(cgltfData, cgltfObject)) + 1]
-
-				if not object then
-					if cgltfObject.light ~= nil then
-						error("TODO")
-					elseif cgltfObject.mesh ~= nil then
-						object = Body.Create()
-
-						object.Mesh = Thread.LoadMeshes(
-							cgltfData,
-							tonumber(cgltf.cgltf_mesh_index(cgltfData, cgltfObject.mesh)) + 1,
-							gltfPath,
-							cache
-						)
-
-						if cgltfObject.skin ~= nil then
-							local skeletonIndex = tonumber(cgltf.cgltf_skin_index(cgltfData, cgltfObject.skin)) + 1
-							local skeleton, bones = skeletons[skeletonIndex]
-
-							if not skeleton then
-								skeleton, bones = Thread.LoadSkeletons(cgltfData, skeletonIndex)
-								
-								for boneIndex, bone in pairs(bones) do
-									objects[boneIndex] = bone
-								end
-
-								skeleton.Parent = model
-
-								skeletons[skeletonIndex] = skeleton
-							end
-
-							object.Skeleton = skeleton.Name
-						end
-					end
-
-					if object then
-						object.Name = cgltfObject.name ~= nil and ffi.string(cgltfObject.name) or nil
-
-						if cgltfObject.has_matrix == 0 then
-							object.Position = cgltfObject.has_translation ~= 0 and Vector3.Create(
-								cgltfObject.translation[0], cgltfObject.translation[1], cgltfObject.translation[2]
-							) or Vector3.Zero
-
-							object.Orientation = cgltfObject.has_rotation ~= 0 and Quaternion.Create(
-								cgltfObject.rotation[3], cgltfObject.rotation[0], cgltfObject.rotation[1], cgltfObject.rotation[2]
-							) or Quaternion.One
-
-							object.Scale = cgltfObject.has_scale ~= 0 and Vector3.Create(
-								cgltfObject.scale[0], cgltfObject.scale[1], cgltfObject.scale[2]
-							) or Vector3.One
-						else
-							local components = cgltfObject.matrix
-
-							local localTransform = Matrix4.Create({
-								components[0], components[1], components[2], components[3],
-								components[4], components[5], components[6], components[7],
-								components[8], components[9], components[10], components[11],
-								components[12], components[13], components[14], components[15]
-							})
-
-							object.Position = localTransform.Position
-							object.Orientation = localTransform.Orientation
-							object.Scale = localTransform.Scale
-						end
-
-						objects[tonumber(cgltf.cgltf_node_index(cgltfData, cgltfObject)) + 1] = object
-					end
-				end
-			end
-
-			for animationIndex = 0, tonumber(cgltfData.animations_count) - 1, 1 do
-				for channelIndex = 0, tonumber(cgltfData.animations[animationIndex].channels_count) - 1, 1 do
-					local target = cgltfData.animations[animationIndex].channels.target_node
-
-					if target ~= nil and objects[tonumber(cgltf.cgltf_node_index(cgltfData, target)) + 1] then
-						Thread.LoadAnimations(cgltfData, animationIndex + 1, cache).Parent = model
-
-						break
-					end
-				end
-			end
-
-			for index, object in pairs(objects) do
-				if not object:IsA("Bone") then
-					local cgltfParent = cgltfData.nodes[index - 1].parent
-
-					object.Parent =
-						cgltfParent ~= nil and objects[tonumber(cgltf.cgltf_node_index(cgltfData, cgltfParent)) + 1] or model
-				end
-			end
-		end
-
-		if destroyData then
-			cgltf.cgltf_free(cgltfData)
+		if destroyScene then
+			Assimp.aiReleaseImport(scene)
 		end
 	end
 
-	return model, cache
+	return result, cache, errorMessage
 end
 
 function lovr.keypressed(key) Input.TriggerInput("k_"..key, Vector3.Forward, false) end
@@ -1187,7 +1271,7 @@ function lovr.run()
 		"Assets/Shaders/Interface/Interface.vert", "Assets/Shaders/Interface/Interface.frag"
 	)
 
-	Thread.Shaders.WorldTangents = lovr.graphics.newShader(
+	Thread.Shaders.World = lovr.graphics.newShader(
 		"Assets/Shaders/World/World.vert", "Assets/Shaders/World/World.frag",
 		{flags = {
 			passColor = true,
@@ -1198,27 +1282,6 @@ function lovr.run()
 			glow = false,
 			normalMap = false,
 			vertexTangents = true,
-			colorTexture = false,
-			glowTexture = false,
-			metalnessTexture = false,
-			roughnessTexture = false,
-			ambientOcclusion = false,
-			clearcoatTexture = false,
-			tonemap = true
-		}}
-	)
-
-	Thread.Shaders.WorldNoTangents = lovr.graphics.newShader(
-		"Assets/Shaders/World/World.vert", "Assets/Shaders/World/World.frag",
-		{flags = {
-			passColor = true,
-			materialColor = false,
-			vertexColors = true,
-			uvTransform = false,
-			alphaCutoff = false,
-			glow = false,
-			normalMap = false,
-			vertexTangents = false,
 			colorTexture = false,
 			glowTexture = false,
 			metalnessTexture = false,
@@ -1268,8 +1331,7 @@ function lovr.run()
 		1, 3, 4
 	})
 
-	Thread.Meshes.Square = Mesh.Create()
-	Thread.Meshes.Square:AddSubmesh(Submesh.Create(square))
+	Thread.Meshes.Square = Mesh.Create(square)
 
 	local cube = lovr.graphics.newMesh({
 		{name = "VertexPosition", type = "vec3"},
@@ -1330,8 +1392,7 @@ function lovr.run()
         21, 22, 23, 23, 24, 21
 	})
 	
-	Thread.Meshes.Cube = Mesh.Create()
-	Thread.Meshes.Cube:AddSubmesh(Submesh.Create(cube))
+	Thread.Meshes.Cube = Mesh.Create(cube)
 
 	Thread.Materials.Default = Material.Create()
 
@@ -1433,8 +1494,12 @@ function lovr.run()
 		Thread.World:Draw(windowPass)
 		Thread.Interface:Draw(windowPass)
 
-		lovr.graphics.submit(windowPass)
+		Thread.AddPass(windowPass)
+
+		lovr.graphics.submit(Thread._Passes)
 		lovr.graphics.present()
+
+		table.erase(Thread._Passes, LovrResourceRelease)
 	end
 end
 

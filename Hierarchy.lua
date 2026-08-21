@@ -29,12 +29,6 @@ local function NewIndexMetamethod(self, name, value)
 					child[dependency] = Class.NIL
 				end
 			end
-
-			if not self.Destroyed then
-				self._Events:Trigger(name.."Changed", setValue, oldValue) 
-				self._Events:TriggerAncestors("Descendant"..name.."Changed", setValue, oldValue)
-				self._Events:TriggerDescendants("Ancestor"..name.."Changed", setValue, oldValue)
-			end
 		end
 	else
 		rawset(self, name, value)
@@ -106,6 +100,8 @@ function Hierarchy:SetParent(parent, where)
 
 				self._Parent = parent
 			end
+
+			self._Events:TriggerAncestors("DescendantParentChanged", parent, oldParent)
 
 			return true, parent
 		end

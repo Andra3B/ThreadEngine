@@ -71,22 +71,20 @@ function World.Create(tags)
 	self._TimeSincePhysicsUpdate = 0
 	self._PhysicsUpdatePeriod = 1 / 60
 
-	self._Lights = table.new(0, 32)
+	self._Lights = table.new(32, 0)
 	self._LightBuffer = lovr.graphics.newBuffer({{
-			name = "Lights", length = 32, type = {
-				{name = "Enabled", type = "uint"},
-				{name = "Type", type = "uint"},
-				{name = "FallOffType", type = "uint"},
-				{name = "FallOffCoefficient", type = "float"},
-				{name = "Radius", type = "float"},
-				{name = "Range", type = "float"},
-				{name = "Intensity", type = "vec3"},
-				{name = "Position", type = "vec3"},
-				{name = "Direction", type = "vec3"}
-			}
-		},
-		layout = "std430"
-	})
+		name = "Lights", length = 32, type = {
+			{name = "Enabled", type = "uint"},
+			{name = "Type", type = "uint"},
+			{name = "FallOffType", type = "uint"},
+			{name = "FallOffCoefficient", type = "float"},
+			{name = "Radius", type = "float"},
+			{name = "Range", type = "float"},
+			{name = "Intensity", type = "vec3"},
+			{name = "Position", type = "vec3"},
+			{name = "Direction", type = "vec3"}
+		}
+	}, layout = "std430"})
 
 	self._DescendantParentChangedListener = self._Events:Listen("DescendantParentChanged", OnDescendantParentChanged)
 
@@ -109,13 +107,7 @@ function World:Update(deltaTime)
 		if self == Thread.World then
 			Thread.PhysicsUpdate(self._PhysicsUpdatePeriod)
 		end
-
-		for descendant in self:IterateDescendants() do
-			if descendant.PostPhysicsUpdate then
-				descendant:PhysicsUpdate(self._PhysicsUpdatePeriod)
-			end
-		end
-
+		
 		self._PhysicsWorld:update(self._PhysicsUpdatePeriod)
 
 		self._TimeSincePhysicsUpdate = self._TimeSincePhysicsUpdate - self._PhysicsUpdatePeriod
@@ -139,11 +131,11 @@ function World:Draw(pass)
 		pass:send("Cubemap", self._Skybox.EnvironmentMap)
 		pass:send("LOD", 0)
 
-		pass:draw(Thread.Meshes.Cube.Submeshes[1].Mesh)
+		pass:draw(Thread.Meshes.Cube.Mesh)
 		
 		pass:setFaceCull("back")
 
-		pass:setShader(Thread.Shaders.WorldTangents)
+		pass:setShader(Thread.Shaders.World)
 
 		pass:send("Skybox", self._Skybox.EnvironmentMap)
 		pass:send("SkyboxHarmonics", self._Skybox.HarmonicsBuffer)
@@ -154,27 +146,14 @@ function World:Draw(pass)
 
 		pass:send("LightBuffer", self._LightBuffer)
 		pass:send("LightCount", #self._Lights)
-
-		pass:send("BoneTransformCount", 0)
-
-		local skeletons = {}
 		
 		for descendant in self:IterateDescendants() do
-			if descendant:IsA("Body") then
+			if descendant:IsA("Mesh") then
 				pass:push("state")
-				local model = descendant:GetAncestorWithType("Model")
-
-				if model then
-					local skeleton = model:GetChildWithName(descendant.Skeleton)
-
-					if skeleton then
-						skeleton:SendToPass(pass)
-					end
-				end
-
-				descendant:Draw(pass)
 
 				pass:send("BoneTransformCount", 0)
+
+				descendant:Draw(pass)
 
 				pass:pop("state")
 			end
@@ -203,7 +182,7 @@ local function RaycastCallback(collider, shape, x, y, z, normalX, normalY, norma
 
 	for i, intersection in ipairs(worldResults) do
 		if relativeDistance <= intersection.RelativeDistance then
-			for j = #worldResults - 1, i, -1 do
+			for j = worldResultsCount - 1, i, -1 do
 				local currentIntersection = worldResults[j]
 				local nextIntersection = worldResults[j + 1]
 
@@ -230,14 +209,14 @@ local function RaycastCallback(collider, shape, x, y, z, normalX, normalY, norma
 			intersection.Normal.Y = normalY
 			intersection.Normal.Z = normalZ
 
-			intersection.Fraction = fraction
+			intersection.RelativeDistance = relativeDistance
 
 			break
 		end
 	end
 
-	if intersections >= #worldResults then
-		return worldResults[#worldResults].fraction
+	if worldResultsCount >= #worldResults then
+		return worldResults[#worldResults].RelativeDistance
 	else
 		return 1
 	end
@@ -372,7 +351,7 @@ function World:GetOverlappingBodies(shape, position, orientation, filter, detect
 end
 
 local function QueryBodiesInShapeCallback(collider)
-	table.insert(worldResults, collider)
+	table.insert(worldResults, collider:getUserData())
 end
 
 function World:QueryBodiesInBox(position, size, filter, firstOnly)
@@ -385,9 +364,9 @@ function World:QueryBodiesInBox(position, size, filter, firstOnly)
 			filter 
 		)
 
-		return {collider:getUserData()}
+		return collider:getUserData()
 	else
-		worldResults = results
+		worldResults = {}
 
 		self._PhysicsWorld:queryBox(
 			position.X, position.Y, position.Z,
@@ -411,9 +390,9 @@ function World:QueryBodiesInSphere(position, radius, filter, firstOnly)
 			filter 
 		)
 
-		return {collider:getUserData()}
+		return collider:getUserData()
 	else
-		worldResults = results
+		worldResults = {}
 
 		self._PhysicsWorld:querySphere(
 			position.X, position.Y, position.Z,

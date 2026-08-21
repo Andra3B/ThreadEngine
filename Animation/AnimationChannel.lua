@@ -50,8 +50,8 @@ function AnimationChannel:Evaluate(time)
 
 			for index, keyframe in ipairs(self._Keyframes) do
 				if keyframe.Time >= time then
-					nextKeyframe = keyframe
 					previousKeyframe = self._Keyframes[index - 1]
+					nextKeyframe = keyframe
 
 					break
 				end

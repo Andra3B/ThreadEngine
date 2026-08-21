@@ -2,17 +2,19 @@ local ffi = require("ffi")
 
 local CBindings = {}
 
-function CBindings.ParseHeader(headerPath, includePaths, preprocessed, gccPath)
-	gccPath = gccPath or "gcc"
-
+function CBindings.ParseHeader(headerPath, includePaths, preprocessed, clPath)
+	clPath = clPath or "cl"
+	
 	if not preprocessed then
-		local command = gccPath.." -E -dD -P -o CBindingsPreprocessedHeader.i \""..headerPath.."\""
+		local command = clPath.." /std:c17 /FiCBindingsPreprocessedHeader.i /d1PP /P"
 
 		if includePaths then
 			for _, path in ipairs(includePaths) do
-				command = command.." -I \""..path.."\""
+				command = command.." /I\""..path.."\""
 			end
 		end
+
+		command = command.." \""..headerPath.."\""
 
 		os.execute(command)
 
@@ -28,50 +30,54 @@ function CBindings.ParseHeader(headerPath, includePaths, preprocessed, gccPath)
 		local declarationString = ""
 
 		for line in headerFile:lines() do
-			local preprocessorDirective = string.match(line, "^%s*#([%w_]+)")
+			if
+				not string.match(line, "^%s*__pragma.*")
+			then
+				local preprocessorDirective = string.match(line, "^%s*#([%w_]+)")
 
-			if preprocessorDirective then
-				if preprocessorDirective == "define" then
-					local name, value = string.match(line,"^%s*#define ([%w_]+) (.*)")
+				if preprocessorDirective then
+					if preprocessorDirective == "define" then
+						local name, value = string.match(line,"^%s*#define ([%w_]+) (.*)")
 
-					if name then
-						if not (string.find(value, "\"", 1, true) or string.find(value, "0x", 1, true)) then
-							value = string.gsub(value, "(%d+)[UuLlFf]+$", "%1")
-						end
+						if name then
+							if not (string.find(value, "\"", 1, true) or string.find(value, "0x", 1, true)) then
+								value = string.gsub(value, "(%d+)[UuLlFf]+$", "%1")
+							end
 
-						local chunk = load("return "..value, nil, "t", defines)
+							local chunk = load("return "..value, nil, "t", defines)
 
-						if chunk then
-							local success, value = pcall(chunk)
+							if chunk then
+								local success, value = pcall(chunk)
 
-							if success then
-								defines[name] = value
+								if success then
+									defines[name] = value
+								end
 							end
 						end
-					end
-				elseif preprocessorDirective == "undef" then
-					local name = string.match(line,"^%s*#undef ([%w_]+)")
+					elseif preprocessorDirective == "undef" then
+						local name = string.match(line,"^%s*#undef ([%w_]+)")
 
-					if name then
-						defines[name] = nil
-					end
-				end
-			elseif string.find(line, "%g") and not string.find(line, "^%s*%[%[") then
-				declarationString = declarationString..line.."\n"
-
-				if string.find(declarationString, ";", 1, true) then
-					local braceCount = 0
-
-					for brace in string.gmatch(declarationString, "[{}]") do
-						braceCount = braceCount + (brace == "{" and 1 or -1)
-					end
-
-					if braceCount == 0 then
-						if pcall(ffi.cdef, declarationString) then
-							finalDeclarationString = finalDeclarationString..declarationString
+						if name then
+							defines[name] = nil
 						end
-						
-						declarationString = ""
+					end
+				elseif string.find(line, "%g") and not string.find(line, "^%s*%[%[") then
+					declarationString = declarationString..line.."\n"
+
+					if string.find(declarationString, ";", 1, true) then
+						local braceCount = 0
+
+						for brace in string.gmatch(declarationString, "[{}]") do
+							braceCount = braceCount + (brace == "{" and 1 or -1)
+						end
+
+						if braceCount == 0 then
+							if pcall(ffi.cdef, declarationString) then
+								finalDeclarationString = finalDeclarationString..declarationString
+							end
+							
+							declarationString = ""
+						end
 					end
 				end
 			end

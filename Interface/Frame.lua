@@ -33,7 +33,7 @@ function Frame:Draw(pass, stencil)
 		pass:setColor(self.BackgroundColour:Unpack())
 	end
 
-    pass:draw(Thread.Meshes.Square.Submeshes[1].Mesh, self.LovrTransform, 1)
+    pass:draw(Thread.Meshes.Square.Mesh, self.LovrTransform, 1)
 end
 
 function Frame:GetCornerRadius()

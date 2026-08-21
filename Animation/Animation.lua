@@ -33,17 +33,29 @@ function Animation:AddChannel(channel)
 	return false
 end
 
-function Animation:RemoveChannel(channel)
-	channel = self._Channels[type(channel) == "table" and channel.Target or channel]
+function Animation:RemoveChannel(channel, property)
+	if type(channel) == "table" then
+		property = channel.Property
+		channel = channel.Target
+	end
 
-	if channel then
-		self._Channels[channel.Target] = nil
+	local targetChannels = self._Channels[channel]
+	local channel = nil
 
-		if channel.Duration == self._Duration then
-			self._Duration = 0
+	if targetChannels then
+		channel = targetChannels[property]
 
-			for _, currentChannel in ipairs(self._Channels) do
-				self._Duration = math.max(self._Duration, channel.Duration)
+		if channel then
+			targetChannels[property] = nil
+
+			if channel.Duration == self._Duration then
+				self._Duration = 0
+				
+				for _, currentTargetChannels in pairs(self._Channels) do
+					for _, currentChannel in pairs(currentTargetChannels) do
+						self._Duration = math.max(self._Duration, currentChannel.Duration)
+					end
+				end
 			end
 		end
 	end

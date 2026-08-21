@@ -1,15 +1,5 @@
 local Skeleton = {}
 
-local function OnDescendantParentChanged(skeleton, descendant)
-	if descendant:IsA("Bone") and descendant:GetAncestorWithType("Skeleton") == skeleton then
-		descendant.InverseBindMatrix = descendant.InverseSkeletonTransform
-
-		for _descendant in descendant:IterateDescendants() do
-			OnDescendantParentChanged(skeleton, _descendant)
-		end
-	end
-end
-
 local function OnDescendantSkeletonTransformChanged(skeleton, descendant)
 	skeleton._Dirty = true
 end
@@ -22,7 +12,6 @@ function Skeleton.Create()
 	self._BoneTransformBuffer = lovr.graphics.newBuffer("mat4", 256)
 	self._BoneTransformCount = 0
 
-	self._DescendantParentChangedListener = self._Events:Listen("DescendantParentChanged", OnDescendantParentChanged)
 	self._DescendantSkeletonTransformChanged = self._Events:Listen("DescendantSkeletonTransformChanged", OnDescendantSkeletonTransformChanged)
 
 	return self
@@ -42,7 +31,7 @@ function Skeleton:Upload()
 		
 		for descendant in self:IterateDescendants() do
 			if descendant:IsA("Bone") then
-				boneTransforms[descendant.BoneID] = (descendant.SkeletonTransform * descendant.InverseBindMatrix).Components
+				boneTransforms[descendant.BoneIndex + 1] = (descendant.SkeletonTransform * descendant.InverseBindMatrix).Components
 			end
 		end
 
@@ -64,10 +53,7 @@ function Skeleton:Destroy()
 	if not self._Destroyed then
 		self._BoneTransformBuffer:release()
 		self._BoneTransformBuffer = nil
-
-		self._DescendantParentChangedListener:Destroy()
-		self._DescendantParentChangedListener = nil
-
+		
 		self._DescendantSkeletonTransformChanged:Destroy()
 		self._DescendantSkeletonTransformChanged = nil
 

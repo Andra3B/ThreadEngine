@@ -1,31 +1,18 @@
 local Bone = {}
 
-function Bone.Create(boneID)
+function Bone.Create(boneIndex)
 	local self = Class.CreateInstance(WorldObject.Create(), Bone)
 
-	self._BoneID = boneID
-	self._InverseBindMatrix = nil
+	self._BoneIndex = boneIndex
+	self._InverseBindMatrix = Matrix4.Identity
 
 	self._SkeletonTransform = Class.NIL
-	self._InverseSkeletonTransform = Class.NIL
 
 	return self
 end
 
-function Bone:SetParent(parent)
-	local set, setValue = WorldObject.SetParent(self, parent)
-
-	if set then
-		local skeleton = self:GetAncestorWithType("Skeleton")
-
-		self.InverseBindMatrix = skeleton and (skeleton.InverseTransform * self.Transform) or nil
-	end
-
-	return set, setValue
-end
-
-function Bone:GetBoneID()
-	return self._BoneID
+function Bone:GetBoneIndex()
+	return self._BoneIndex
 end
 
 function Bone:GetInverseBindMatrix()	
@@ -56,25 +43,11 @@ function Bone:GetSkeletonTransform()
 end
 
 function Bone:SetSkeletonTransform(transform)
-	if transform ~= self._SkeletonTransform then
+	if transform == Class.NIL or transform ~= self._SkeletonTransform then
+		local oldTransform = self._SkeletonTransform
 		self._SkeletonTransform = transform
 
-		return true, transform
-	end
-end
-
---[[DependsOn: SkeletonTransform]]--
-function Bone:GetInverseSkeletonTransform()
-	if self._InverseSkeletonTransform == Class.NIL then
-		self._InverseSkeletonTransform = self.SkeletonTransform:Inverse()
-	end
-
-	return self._InverseSkeletonTransform
-end
-
-function Bone:SetInverseSkeletonTransform(transform)
-	if transform ~= self._InverseSkeletonTransform then
-		self._InverseSkeletonTransform = transform
+		self._Events:TriggerAncestors("DescendantSkeletonTransformChanged", transform, oldTransform)
 
 		return true, transform
 	end
@@ -85,7 +58,6 @@ function Bone:Destroy()
 		self._InverseBindMatrix = nil
 
 		self._SkeletonTransform = nil
-		self._InverseSkeletonTransform = nil
 
 		WorldObject.Destroy(self)
 	end
